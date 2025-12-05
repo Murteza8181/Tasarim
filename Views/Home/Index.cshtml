@@ -1270,13 +1270,11 @@ if (selectAllBtn) {
 // Etiketten Çıkar butonu
 elements.removeFromTagBtn?.addEventListener('click', async () => {
   if (!state.activeTag) {
-    alert('Aktif etiket bulunamadı!');
     return;
   }
   
   const selectedItems = state.selectedDesigns;
   if (selectedItems.length === 0) {
-    alert('Lütfen etiketten çıkarmak istediğiniz desenleri seçin!');
     return;
   }
   
@@ -1307,7 +1305,6 @@ elements.removeFromTagBtn?.addEventListener('click', async () => {
     if (elements.removeFromTagBtn) {
       elements.removeFromTagBtn.style.display = 'none';
     }
-    alert('Tüm desenler etiketten çıkarıldı. Normal görünüme dönülüyor.');
     location.reload(); // Veya loadCategoryGallery() çağır
   } else {
     // Etiket görünümünü yenile
@@ -2123,7 +2120,6 @@ async function addSelectedDesignsToTag(tag) {
   const allSelectedItems = [...state.selectedDesigns, ...state.selectedVariants];
   
   if (allSelectedItems.length === 0) {
-    alert('Lütfen önce desen veya varyant seçin!');
     return;
   }
   
@@ -2170,7 +2166,6 @@ function showTaggedDesigns(tag) {
   const taggedItems = state.taggedDesigns[tag] || [];
   
   if (taggedItems.length === 0) {
-    alert(`"${tag}" etiketine henüz desen eklenmemiş.`);
     return;
   }
   
@@ -2208,7 +2203,6 @@ async function addTag() {
   // İlk harf büyük, diğerleri küçük
   const formatted = val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
   if (state.tags.includes(formatted)) {
-    alert('Bu etiket zaten eklenmiş');
     return;
   }
   state.tags.push(formatted);
@@ -2232,7 +2226,6 @@ elements.tagCombobox?.addEventListener('change', (e) => {
 elements.tagAddSelectedBtn?.addEventListener('click', async () => {
   const selectedTag = elements.tagCombobox?.value;
   if (!selectedTag) {
-    alert('Lütfen önce bir etiket seçin!');
     return;
   }
   await addSelectedDesignsToTag(selectedTag);
@@ -2242,7 +2235,6 @@ elements.tagAddSelectedBtn?.addEventListener('click', async () => {
 elements.tagDeleteBtn?.addEventListener('click', async () => {
   const selectedTag = elements.tagCombobox?.value;
   if (!selectedTag) {
-    alert('Lütfen önce bir etiket seçin!');
     return;
   }
   if (confirm(`"${selectedTag}" etiketini silmek istediğinize emin misiniz?`)) {
@@ -2267,8 +2259,8 @@ elements.tagDeleteBtn?.addEventListener('click', async () => {
 renderTags();
 
 // Tag persistence - Sunucuya kaydet
-// window.location.hostname kullanarak farklı bilgisayarlardan erişimi sağla
-const TAGS_API_URL = `http://${window.location.hostname}:8001/tags`;
+// IIS Proxy üzerinden erişim (TagsController)
+const TAGS_API_URL = '/api/tags';
 
 async function persistTags(){
   try {

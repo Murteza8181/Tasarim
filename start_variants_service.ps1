@@ -22,5 +22,14 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Servis başlatılıyor: http://0.0.0.0:8001" -ForegroundColor Green
+
+# Firewall kuralını garantiye al (Yönetici izni gerekir)
+try {
+    New-NetFirewallRule -DisplayName "Tasarim Python API" -Direction Inbound -LocalPort 8001 -Protocol TCP -Action Allow -Profile Any -ErrorAction SilentlyContinue | Out-Null
+    Write-Host "Firewall kuralı (Port 8001) eklendi/güncellendi." -ForegroundColor Cyan
+} catch {
+    Write-Host "Firewall kuralı eklenemedi (Yönetici izni gerekebilir), ancak servis başlatılıyor." -ForegroundColor Yellow
+}
+
 Write-Host "Network erişimi aktif - tüm kullanıcılar erişebilir" -ForegroundColor Cyan
 py -m uvicorn variants_api:app --host 0.0.0.0 --port 8001 --reload

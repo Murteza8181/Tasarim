@@ -32,3 +32,5 @@ api_startup.log
 
 ## DLL files (zaten var olanlar hariç tutulabilir)
 # Gerekirse silip tekrar ekleyin
+
+web.config.bak
