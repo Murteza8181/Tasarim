@@ -1,0 +1,31 @@
+## Visual Studio / .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.log
+.vs/
+*.dll
+*.exe
+*.pdb
+TasarimWeb.dll.old
+
+## Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+
+## Logs
+logs/
+*.log
+api_startup.log
+
+## Cache files
+.desenler_cache.json
+.varyantlar_cache.json
+
+## DLL files (zaten var olanlar hariç tutulabilir)
+# Gerekirse silip tekrar ekleyin

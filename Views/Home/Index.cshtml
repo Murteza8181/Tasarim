@@ -1,0 +1,2703 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@{
+  Layout = null;
+  // Tarayıcı file:/// yollarını engeller; uygulama içi statik kaynağı kullan.
+  var logoPath = Url.Content("~/img/orhan-logo.png");
+  var variantRoot = Configuration["VaryantKlasoru"] ?? string.Empty;
+  string[] globalVariantFolders = System.Array.Empty<string>();
+  try {
+    if (!string.IsNullOrWhiteSpace(variantRoot) && System.IO.Directory.Exists(variantRoot)) {
+      globalVariantFolders = System.IO.Directory.GetDirectories(variantRoot);
+    }
+  } catch { globalVariantFolders = System.Array.Empty<string>(); }
+}
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Orhan Karakoç Tekstil · Desen Arama</title>
+  <link rel="icon" href="~/img/orhan-logo.png" type="image/png" />
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg:#0b1120;
+      --panel:#111a2e;
+      --panel-strong:#152243;
+      --accent:#3b82f6;
+      --accent-strong:#2563eb;
+      --text:#f8fafc;
+      --text-muted:#94a3b8;
+      --border:rgba(148,163,184,.2);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
+      background: radial-gradient(circle at top, rgba(59,130,246,.25), transparent 45%), var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+      position: relative;
+      overflow-x: hidden;
+    }
+    body::before,
+    body::after {
+      content: '';
+      position: fixed;
+      width: 520px;
+      height: 520px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(59,130,246,.2), transparent 70%);
+      filter: blur(20px);
+      opacity: .8;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::before { top: -200px; right: -120px; }
+    body::after { bottom: -180px; left: -120px; background: radial-gradient(circle, rgba(14,165,233,.2), transparent 70%); }
+    .shell { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; position: relative; z-index: 1; }
+    .badge {
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: .85rem;
+      border: 1px solid rgba(148,163,184,.4);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .badge.ok { background: rgba(16,185,129,.15); color: #6ee7b7; border-color: rgba(16,185,129,.35); }
+    .badge.warn { background: rgba(234,179,8,.15); color: #fde68a; border-color: rgba(234,179,8,.35); }
+    .grid { display: flex; gap: 0; position: relative; }
+    .grid > section:first-child { width: 280px; min-width: 200px; max-width: 500px; flex-shrink: 0; }
+    .grid > #center-panel { flex: 1; min-width: 400px; margin: 0 20px; }
+    .grid > #right-panel { width: 320px; min-width: 250px; max-width: 600px; flex-shrink: 0; }
+    .resizer { width: 4px; cursor: col-resize; background: transparent; position: relative; flex-shrink: 0; z-index: 10; }
+    .resizer:hover, .resizer.resizing { background: rgba(59,130,246,.5); }
+    .resizer::before { content: ''; position: absolute; top: 0; bottom: 0; left: -4px; right: -4px; }
+    .stack { display: flex; flex-direction: column; gap: 20px; }
+    .panel {
+      background: var(--panel);
+      border-radius: 20px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 40px rgba(2,6,23,.45);
+    }
+    .panel-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .panel h2 { margin: 0 0 12px; font-size: 1.05rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    label { font-size: .85rem; color: var(--text-muted); }
+    input[type="text"], select {
+      background: var(--panel-strong);
+      border: 1px solid rgba(148,163,184,.25);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: .95rem;
+    }
+    select:disabled { opacity: .6; cursor: not-allowed; }
+    .pill-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .pill { padding: 4px 12px; border-radius: 999px; font-size: .8rem; background: rgba(156,39,176,.2); color: #e1bee7; border: 1px solid rgba(156,39,176,.5); cursor: pointer; transition: all 0.2s ease; }
+    .pill:hover { background: rgba(156,39,176,.3); border-color: rgba(156,39,176,.7); }
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: .95rem;
+      letter-spacing: .02em;
+      cursor: pointer;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+    }
+    button.primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      color: #fff;
+      box-shadow: 0 10px 25px rgba(59,130,246,.35);
+    }
+    button.primary:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+    button.primary.active, button.ghost.active {
+      box-shadow: 0 0 0 3px rgba(255,255,255,.6);
+    }
+    button.ghost {
+      background: rgba(15,23,42,.6);
+      color: var(--text-muted);
+      border: 1px solid rgba(148,163,184,.2);
+    }
+    button:hover:not(:disabled) { transform: translateY(-2px); }
+    .camera-card, .preview-card, .result-card {
+      background: var(--panel-strong);
+      border-radius: 18px;
+      border: 1px solid rgba(148,163,184,.2);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .camera-card input[type="file"] {
+      border: 2px dashed rgba(59,130,246,.4);
+      padding: 28px;
+      border-radius: 14px;
+      text-align: center;
+      cursor: pointer;
+      color: var(--text-muted);
+      background: rgba(30,41,59,.6);
+    }
+    .preview-window {
+      position: relative;
+      min-height: 260px;
+      border-radius: 16px;
+      background: #020617;
+      border: 1px solid rgba(148,163,184,.25);
+      overflow: hidden;
+    }
+    .preview-window img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    /* Tam ekran görüntüleme overlay */
+    .fullscreen-overlay { position:fixed; inset:0; background:#000; display:none; z-index:10000; align-items:center; justify-content:center; }
+    .fullscreen-overlay.open { display:flex; }
+    .fullscreen-overlay img { max-width:95vw; max-height:95vh; object-fit:contain; }
+    .fullscreen-close { position:absolute; top:20px; right:20px; background:rgba(0,0,0,.6); color:#fff; border:1px solid #444; padding:10px 14px; border-radius:8px; cursor:pointer; font-size:.85rem; }
+    .preview-overlay {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+    }
+    .match-meta { font-size: .85rem; color: var(--text-muted); }
+    .result-list { display: flex; flex-direction: column; gap: 12px; }
+    .result-item {
+      border-radius: 14px;
+      background: rgba(15,23,42,.7);
+      border: 1px solid rgba(148,163,184,.2);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .result-item.active { border-color: rgba(59,130,246,.6); box-shadow: 0 0 0 1px rgba(59,130,246,.35); }
+    .result-item .score { color: #facc15; font-weight: 600; }
+    .result-item small { color: var(--text-muted); font-size: .8rem; }
+    .json-dump { margin-top: 18px; background: rgba(2,6,23,.9); border-radius: 14px; border: 1px solid rgba(148,163,184,.2); }
+    details { padding: 16px; }
+    pre { margin: 12px 0 0; white-space: pre-wrap; word-break: break-word; color: #a5b4fc; }
+    .empty-state { text-align: center; padding: 30px; color: var(--text-muted); }
+    .empty-state.subtle { padding: 20px; border: 1px dashed rgba(148,163,184,.25); border-radius: 12px; }
+    .chip { font-size: .75rem; padding: 6px 10px; border-radius: 999px; background: rgba(15,23,42,.65); border: 1px solid rgba(148,163,184,.25); }
+    .archive-preview {
+      margin-top: 20px;
+      border-radius: 16px;
+      background: rgba(12,18,34,.85);
+      border: 1px solid rgba(148,163,184,.2);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .archive-preview-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .archive-preview-header h3 { margin: 0; font-size: .95rem; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); }
+    .archive-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 12px; }
+    .archive-item {
+      position: relative;
+      border-radius: 14px;
+      border: 1px solid rgba(148,163,184,.25);
+      overflow: hidden;
+      min-height: 96px;
+      background: radial-gradient(circle at top, rgba(15,23,42,.7), rgba(15,23,42,.9));
+      padding: 0;
+      cursor: pointer;
+    }
+    .archive-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .archive-item-label {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 6px 10px;
+      font-size: .75rem;
+      background: linear-gradient(180deg, transparent, rgba(2,6,23,.85));
+      color: #e2e8f0;
+      text-align: center;
+    }
+    .archive-item.active { border-color: rgba(59,130,246,.7); box-shadow: 0 0 0 1px rgba(59,130,246,.35); }
+    .archive-actions { display: flex; gap: 10px; }
+    .archive-actions button { flex: 1; }
+    .gallery-panel { }
+    .gallery-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .gallery-header p { margin: 4px 0 0; color: var(--text-muted); font-size: .85rem; }
+    .gallery-grid { 
+      margin-top: 16px; 
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-behavior: smooth;
+      padding: 8px 0;
+      min-height: 160px;
+      cursor: grab;
+    }
+    .gallery-grid:active {
+      cursor: grabbing;
+    }
+    .gallery-grid::-webkit-scrollbar { height: 8px; }
+    .gallery-grid::-webkit-scrollbar-track { background: rgba(148,163,184,.1); border-radius: 4px; }
+    .gallery-grid::-webkit-scrollbar-thumb { background: rgba(59,130,246,.4); border-radius: 4px; }
+    .gallery-grid::-webkit-scrollbar-thumb:hover { background: rgba(59,130,246,.6); }
+    
+    /* Checkbox stilleri */
+    .design-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #fff;
+      border-radius: 4px;
+      background: rgba(0,0,0,0.5);
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s ease;
+    }
+    .design-checkbox:checked {
+      background: #007bff;
+      border-color: #007bff;
+    }
+    .design-checkbox:checked::after {
+      content: '✓';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .design-checkbox:hover {
+      transform: scale(1.1);
+    }
+    
+    .gallery-item { 
+      position: relative; 
+      border-radius: 8px; 
+      overflow: hidden; 
+      background: var(--panel-strong); 
+      border: 2px solid rgba(148,163,184,.3); 
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; 
+      cursor: pointer;
+      min-width: 110px;
+      max-width: 110px;
+      height: 140px;
+      flex-shrink: 0;
+    }
+    .gallery-item:hover {
+      transform: translateY(-2px);
+      border-color: rgba(59,130,246,.6);
+      box-shadow: 0 4px 12px rgba(59,130,246,.3);
+    }
+    .gallery-item.selected-image {
+      border-color: #e91e63 !important;
+      box-shadow: 0 0 0 3px rgba(233,30,99,.3);
+    }
+    .gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .gallery-item .label {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 8px 10px;
+      background: linear-gradient(180deg, transparent, rgba(2,6,23,.85));
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .gallery-item .label strong { font-size: .85rem; }
+    .gallery-item .label span { font-size: .7rem; color: var(--text-muted); }
+    .gallery-item:hover { border-color: rgba(59,130,246,.5); box-shadow: 0 10px 25px rgba(15,23,42,.5); }
+    @@media (max-width: 1200px) {
+      .grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+    }
+    .logo-dialog {
+      position: fixed;
+      inset: 0;
+      background: rgba(2,6,23,.8);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 10;
+    }
+    .logo-dialog.open { display: flex; }
+    .logo-card {
+      width: min(520px, 100%);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      text-align: center;
+    }
+    .logo-card .drop-zone {
+      border: 2px dashed rgba(59,130,246,.4);
+      border-radius: 16px;
+      padding: 24px;
+      cursor: pointer;
+      color: var(--text-muted);
+      background: rgba(13,18,35,.7);
+    }
+    .logo-card input { display: none; }
+    .logo-card img { max-width: 240px; height: auto; margin: 0 auto; }
+
+    @@media (max-width: 768px) {
+      body { padding: 12px; }
+      .shell { gap: 16px; }
+      .panel { padding: 14px; }
+      .preview-window { min-height: 220px; }
+      .archive-grid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+      button { width: 100%; min-height: 44px; }
+      .archive-actions { flex-direction: column; }
+      .grid { 
+        flex-direction: column !important;
+        gap: 16px !important;
+      }
+      .grid > section:first-child,
+      .grid > #center-panel,
+      .grid > #right-panel {
+        width: 100% !important;
+        min-width: unset !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+      }
+      .resizer { display: none !important; }
+      .folder-item { min-height: 44px; font-size: 14px !important; }
+      .pill { min-height: 36px; padding: 8px 14px; font-size: 13px; }
+      .gallery-grid { gap: 8px; }
+      .gallery-item { min-width: 90px; max-width: 90px; height: 115px; }
+    }
+    @@media (max-width: 520px) {
+      body { padding: 8px; }
+      .camera-card input[type="file"] { padding: 18px; }
+      .shell { gap: 12px; }
+      .panel { padding: 12px; }
+      .gallery-grid { gap: 6px; }
+      .gallery-item { min-width: 80px; max-width: 80px; height: 100px; }
+      .panel h2 { font-size: 0.9rem; }
+      button { min-height: 48px; font-size: 15px; }
+      .folder-item { font-size: 13px !important; padding: 12px !important; }
+    }
+    /* Aktif durum stilleri */
+    .active-category { outline: 2px solid #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.15); }
+    .folder-item.active-folder { background:#0d47a1 !important; box-shadow: 0 0 0 2px rgba(255,255,255,.25); }
+  </style>
+  <script>
+    // Sunucu tarafında bulunan varyant klasörleri (mevcut dizinlerden alınır)
+    @{
+      var names = new List<string>();
+      foreach (var dir in globalVariantFolders) {
+        try {
+          var name = System.IO.Path.GetFileName(dir);
+          if (!string.IsNullOrWhiteSpace(name)) names.Add(name);
+        } catch { }
+      }
+      var json = System.Text.Json.JsonSerializer.Serialize(names);
+    }
+    const serverVariantFolders = @Html.Raw(json);
+  </script>
+</head>
+<body>
+<div class="shell">
+  <div id="fullscreen-overlay" class="fullscreen-overlay">
+    <button type="button" id="fullscreen-close" class="fullscreen-close">Çık (Esc)</button>
+    <img id="fullscreen-img" alt="Tam ekran" />
+  </div>
+  <div class="logo-dialog" id="logo-modal">
+    <div class="panel logo-card">
+      <div class="panel-title">
+        <h2>Logo Ayarı</h2>
+        <button type="button" class="ghost" id="logo-close">Kapat</button>
+      </div>
+      <img id="logo-preview" src="@logoPath" alt="Logo önizleme" style="max-width:240px; height:auto; margin:0 auto;" />
+      <label class="drop-zone" for="logo-input">
+        <strong>Kurumsal logonuzu yükleyin</strong>
+        <p style="margin:6px 0 12px;">PNG · JPG · SVG desteklenir · 5MB sınır.</p>
+        <input type="file" id="logo-input" accept="image/*" />
+      </label>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button type="button" class="ghost" id="logo-reset">Varsayılan logoya dön</button>
+        <button type="button" class="primary" id="logo-close-secondary">Kapat</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="grid">
+    <section class="panel" id="left-panel" style="display:flex; flex-direction:column; gap:16px;">
+      <!-- Logo Frame -->
+      <div id="logo-frame" style="background:#2d3748; border:2px solid #4299e1; border-radius:12px; padding:8px; min-height:120px; display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative;" title="Logonuzu değiştirmek için tıklayın">
+        <img id="side-logo" src="@logoPath" data-default="@logoPath" alt="Logo" style="max-width:90%; max-height:100px; object-fit:contain;" />
+        <div style="position:absolute; top:4px; right:4px; background:rgba(0,0,0,0.6); padding:4px 8px; border-radius:4px; font-size:10px;">🖼️</div>
+      </div>
+
+      <!-- Kategori Butonları -->
+      <div style="display:flex; gap:8px;">
+        <button class="primary" id="btn-desenler" style="flex:1; background:#ff9800; border:none; height:44px; font-size:14px; font-weight:bold;">🎨 Desenler</button>
+        <button class="ghost" id="btn-varyantlar" style="flex:1; background:#424242; border:none; height:44px; font-size:14px; font-weight:bold; color:#fff;">📁 Varyantlar</button>
+      </div>
+
+      <!-- Yeni Tasarımlar Badge - Sadece Desenler'de görünür -->
+      <button id="yeni-tasarimlar-badge" class="folder-item" data-folder="Yeni Tasarımlar" style="background:#ff9800; padding:12px; border-radius:8px; border:none; width:100%; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <div style="font-size:12px; font-weight:bold; color:#fff;">⭐⭐⭐ Yeni Tasarımlar ⭐⭐⭐</div>
+        <div style="font-size:18px; font-weight:bold; color:#00ff00; margin-top:4px;">(6 desen)</div>
+      </button>
+
+      <!-- Yeni Desen Varyantları Badge - Sadece Varyantlar'da görünür -->
+      <button id="yeni-varyantlar-badge" class="folder-item variant-folder-item" data-folder="Yeni Desen Varyantları" style="background:#ffa726; padding:12px; border-radius:8px; border:none; width:100%; cursor:pointer; display:none; flex-direction:column; align-items:center; justify-content:center;">
+        <div style="font-size:12px; font-weight:bold; color:#fff;">⭐⭐⭐ Yeni Desen Varyantları ⭐⭐⭐</div>
+        <div style="font-size:18px; font-weight:bold; color:#00ff00; margin-top:4px;">(201 varyant)</div>
+      </button>
+
+      <!-- Klasör Listesi -->
+      <div id="folder-list" style="display:flex; flex-direction:column; gap:6px; max-height:400px; overflow-y:auto;">
+        <button class="folder-item ghost" data-folder="Çizgi Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Çizgi Desenler <span style="color:#ef5350; float:right;">(? desen)</span></button>
+        <button class="folder-item ghost" data-folder="Dar Viskon Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Dar Viskon Desenler <span style="color:#ef5350; float:right;">(139 desen)</span></button>
+        <button class="folder-item ghost" data-folder="Ekose Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Ekose Desenler <span style="color:#ef5350; float:right;">(? desen)</span></button>
+        <button class="folder-item ghost" data-folder="Eteği Sulu Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Eteği Sulu Desenler <span style="color:#ef5350; float:right;">(79 desen)</span></button>
+        <button class="folder-item ghost" data-folder="Geniş Viskon Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Geniş Viskon Desenler <span style="color:#ef5350; float:right;">(245 desen)</span></button>
+        <button class="folder-item ghost" data-folder="Karma Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Karma Desenler <span style="color:#ef5350; float:right;">(? desen)</span></button>
+        <button class="folder-item ghost" data-folder="Leopar Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Leopar Desenler <span style="color:#ef5350; float:right;">(83 desen)</span></button>
+        <button class="folder-item ghost" data-folder="Süet Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Süet Desenler <span style="color:#ef5350; float:right;">(251 desen)</span></button>
+        <button class="folder-item ghost" data-folder="Şablonu Olan Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Şablonu Olan Desenler <span style="color:#ef5350; float:right;">(? desen)</span></button>
+        <button class="folder-item ghost" data-folder="Turlu Viskon Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Turlu Viskon Desenler <span style="color:#ef5350; float:right;">(395 desen)</span></button>
+        <button class="folder-item ghost" data-folder="Yeni Tasarımlar" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Yeni Tasarımlar <span style="color:#ef5350; float:right;">(? desen)</span></button>
+      </div>
+
+      <!-- Arama -->
+      <input type="text" id="search-input" placeholder="🔍 Desen veya etiket ara..." style="width:100%; padding:10px; border-radius:8px; background:#1e293b; border:1px solid #475569; color:#fff;" />
+
+      <!-- Seçim Bilgisi ve Tümünü Seç -->
+      <div id="selection-info" style="display:none; padding:8px; background:#1e40af; color:#fff; border-radius:6px; text-align:center; font-size:13px; font-weight:bold;"></div>
+      <button class="ghost" id="select-all-btn" style="width:100%; background:#6366f1; border:none; height:40px; font-size:13px; font-weight:bold; color:#fff;">☑️ Tümünü Seç</button>
+      
+      <!-- Etiketten Çıkar Butonu (sadece etiket görünümünde görünür) -->
+      <button class="ghost" id="remove-from-tag-btn" style="display:none; width:100%; background:#ef4444; border:none; height:40px; font-size:13px; font-weight:bold; color:#fff; opacity:0.5; cursor:not-allowed;" disabled>🗑️ Etiketten Çıkar</button>
+
+      <!-- Alt Butonlar -->
+      <button class="primary" id="share-btn" style="width:100%; background:#25D366; border:none; height:44px; font-size:14px; font-weight:bold; opacity:0.5; cursor:not-allowed;" disabled>📤 WhatsApp'a Gönder</button>
+      <button class="primary" id="refresh-btn" style="width:100%; background:#4caf50; border:none; height:44px; font-size:14px; font-weight:bold;">🔄 Yenile</button>
+      <button class="ghost" id="exit-btn" style="width:100%; background:#f44336; border:none; height:44px; font-size:14px; font-weight:bold; color:#fff;">❌ Çıkış</button>
+    </section>
+    <div class="resizer" id="left-resizer"></div>
+    <section id="center-panel" style="display:flex; flex-direction:column; gap:12px; flex:1;">
+      <section class="panel" style="padding-bottom:8px;">
+        <h2 id="main-title">🖼️ Ana Önizleme</h2>
+        <div class="preview-window" style="height:500px; margin-top:16px; margin-bottom:0;">
+          <img id="main-preview" alt="Ana önizleme" />
+        </div>
+        
+        <!-- Film Şeridi Önizleme -->
+        <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(148,163,184,.15);">
+          <div id="subfolders-list" class="pill-list" style="margin-bottom:8px;"></div>
+          <div id="gallery-grid" class="gallery-grid"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="camera-card">
+          <label for="file-input">Telefon Kamerası</label>
+          <input id="file-input" type="file" accept="image/*" capture="environment" />
+          <div style="display:flex; gap:8px;">
+            <button class="ghost" type="button" id="capture-btn">Kamerayı Aç</button>
+            <button class="primary" type="button" id="analyze-btn" disabled>Aramayı Başlat</button>
+          </div>
+          <small style="color:var(--text-muted);">Desteklenen formatlar: JPG · PNG · BMP · 20MB sınır</small>
+        </div>
+      </section>
+    </section>
+    <div class="resizer" id="right-resizer"></div>
+    <section class="panel" id="right-panel" style="display:flex; flex-direction:column; gap:16px;">
+      <button class="primary" type="button" id="archive-search-btn" style="width:100%; height:50px; font-size:16px; margin-bottom:10px;">🔍 Arşivden Ara</button>
+      <button class="primary" type="button" id="search-by-image-btn" style="width:100%; height:46px; font-size:15px; margin-bottom:20px;">📷 Resimden Ara</button>
+      <input id="search-file-input" type="file" accept="image/*" capture="environment" style="display:none;" />
+      
+      <h2>🏷️ Etiket Yönetimi</h2>
+      <div style="margin-top:16px;">
+        <input type="text" id="new-tag-input" placeholder="🔖 Yeni etiket ekle..." style="width:100%; margin-bottom:10px;" />
+        <button class="primary" type="button" id="add-tag-btn" style="width:100%; margin-bottom:20px;">➕ Ekle (Enter)</button>
+        
+        <h3 style="font-size:14px; margin-bottom:10px;">Mevcut Etiketler</h3>
+        <div id="tag-list" style="display:flex; flex-direction:column; gap:8px;">
+          <div class="empty-state subtle">Henüz etiket eklenmedi</div>
+        </div>
+      </div>
+      
+      <h3 style="font-size:14px; margin-top:24px; margin-bottom:10px;">📊 İstatistikler</h3>
+      <div style="background:rgba(31,106,165,0.1); padding:12px; border-radius:8px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+          <span>Desen klasörleri:</span><strong id="stat-folders">...</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+          <span>Varyant klasörleri:</span><strong id="stat-variant-folders">...</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+          <span>Desenler:</span><strong id="stat-designs">...</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+          <span>Varyantlar:</span><strong id="stat-variants">...</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <span>Etiketli:</span><strong id="stat-tagged" style="color:#f44336;">0</strong>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+// Panel Resizer
+(function initResizers() {
+  const leftResizer = document.getElementById('left-resizer');
+  const rightResizer = document.getElementById('right-resizer');
+  const leftPanel = document.getElementById('left-panel');
+  const rightPanel = document.getElementById('right-panel');
+
+  let isResizing = false;
+  let currentResizer = null;
+
+  // localStorage'dan kaydedilmiş genişlikleri yükle
+  const savedLeftWidth = localStorage.getItem('leftPanelWidth');
+  const savedRightWidth = localStorage.getItem('rightPanelWidth');
+  
+  if (savedLeftWidth) {
+    leftPanel.style.width = savedLeftWidth + 'px';
+  }
+  if (savedRightWidth) {
+    rightPanel.style.width = savedRightWidth + 'px';
+  }
+
+  function startResize(resizer) {
+    isResizing = true;
+    currentResizer = resizer;
+    resizer.classList.add('resizing');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }
+
+  function stopResize() {
+    if (currentResizer) {
+      currentResizer.classList.remove('resizing');
+      currentResizer = null;
+    }
+    isResizing = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    
+    // Değişiklikleri localStorage'a kaydet
+    localStorage.setItem('leftPanelWidth', leftPanel.offsetWidth);
+    localStorage.setItem('rightPanelWidth', rightPanel.offsetWidth);
+  }
+
+  function resize(e) {
+    if (!isResizing || !currentResizer) return;
+    
+    const gridRect = document.querySelector('.grid').getBoundingClientRect();
+    
+    if (currentResizer === leftResizer) {
+      const newWidth = e.clientX - gridRect.left;
+      if (newWidth >= 200 && newWidth <= 500) {
+        leftPanel.style.width = newWidth + 'px';
+      }
+    } else if (currentResizer === rightResizer) {
+      const newWidth = gridRect.right - e.clientX;
+      if (newWidth >= 250 && newWidth <= 600) {
+        rightPanel.style.width = newWidth + 'px';
+      }
+    }
+  }
+
+  leftResizer.addEventListener('mousedown', () => startResize(leftResizer));
+  rightResizer.addEventListener('mousedown', () => startResize(rightResizer));
+  
+  document.addEventListener('mousemove', resize);
+  document.addEventListener('mouseup', stopResize);
+})();
+
+const state = {
+  file: null,
+  results: [],
+  selected: null,
+  gallery: [],
+  currentCategory: null,
+  tags: [],
+  taggedDesigns: {}, // { 'etiketAdı': [{token, fileName, folder, numara}, ...] }
+  activeTag: null, // Şu anda görüntülenen etiket
+  mainToken: null,
+  subfolderFilter: null,
+  variantSubfolderFilter: null,
+  variants: [],
+  _variantsLoading: false,
+  searchQuery: '', // Arama query'si
+  selectedDesigns: [], // Seçili desenler: {token, fileName, folder, numara}
+  selectedVariants: [] // Seçili varyantlar
+};
+// Element referanslarını lazy olarak al (DOM hazır olduğunda)
+const elements = {};
+function getElements() {
+  if (elements._initialized) return elements;
+  Object.assign(elements, {
+    input: document.getElementById('file-input'),
+    analyze: document.getElementById('analyze-btn'),
+    capturePreview: document.getElementById('capture-preview'),
+    captureLabel: document.getElementById('capture-label'),
+    captureMeta: document.getElementById('capture-meta'),
+    matchPreview: document.getElementById('match-preview'),
+    matchLabel: document.getElementById('match-label'),
+    matchMeta: document.getElementById('match-meta'),
+    matchScore: document.getElementById('match-score'),
+    resultList: document.getElementById('result-list'),
+    jsonOutput: document.getElementById('json-output'),
+    archiveGrid: document.getElementById('archive-grid'),
+    refreshArchive: document.getElementById('refresh-archive'),
+    pythonStatus: document.getElementById('python-status'),
+    sideLogo: document.getElementById('side-logo'),
+    logoFrame: document.getElementById('logo-frame'),
+    logoPreview: document.getElementById('logo-preview'),
+    logoInput: document.getElementById('logo-input'),
+    logoReset: document.getElementById('logo-reset'),
+    galleryGrid: document.getElementById('gallery-grid'),
+    refreshGallerySecondary: document.getElementById('refresh-gallery-secondary'),
+    galleryDescription: document.getElementById('gallery-description'),
+    logoModal: document.getElementById('logo-modal'),
+    logoClose: document.getElementById('logo-close'),
+    logoCloseSecondary: document.getElementById('logo-close-secondary'),
+    mainPreview: document.getElementById('main-preview'),
+    mainTitle: document.getElementById('main-title'),
+    btnDesenler: document.getElementById('btn-desenler'),
+    btnVaryantlar: document.getElementById('btn-varyantlar'),
+    archiveSearchBtn: document.getElementById('archive-search-btn'),
+    searchBtn: document.getElementById('search-by-image-btn'),
+    searchFile: document.getElementById('search-file-input'),
+    searchInput: document.getElementById('search-input'),
+    shareBtn: document.getElementById('share-btn'),
+    removeFromTagBtn: document.getElementById('remove-from-tag-btn'),
+    refreshBtn: document.getElementById('refresh-btn'),
+    exitBtn: document.getElementById('exit-btn'),
+    tagInput: document.getElementById('new-tag-input'),
+    addTagBtn: document.getElementById('add-tag-btn'),
+    tagList: document.getElementById('tag-list'),
+    fullscreenOverlay: document.getElementById('fullscreen-overlay'),
+    fullscreenImg: document.getElementById('fullscreen-img'),
+    fullscreenClose: document.getElementById('fullscreen-close'),
+    _initialized: true
+  });
+  return elements;
+}
+getElements(); // İlk çağrı
+// Desen sol paneli için başlangıç HTML'ini sakla
+let defaultDesenFolderListHTML = (document.getElementById('folder-list')?.innerHTML) || '';
+const defaultLogoSrc = elements.sideLogo?.dataset?.default || elements.sideLogo?.src;
+const logoStorageKey = 'tasarim.customLogo';
+
+const bytesToSize = bytes => {
+  if (!bytes) return '0 KB';
+  const sizes = ['B','KB','MB','GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
+};
+
+const encodePath = path => btoa(unescape(encodeURIComponent(path)));
+
+function toggleLogoModal(forceOpen) {
+  if (!elements.logoModal) return;
+  const shouldOpen = typeof forceOpen === 'boolean'
+    ? forceOpen
+    : !elements.logoModal.classList.contains('open');
+  elements.logoModal.classList.toggle('open', shouldOpen);
+}
+
+async function pingPython() {
+  if (!elements.pythonStatus) return;
+  try {
+    const resp = await fetch('/healthz', { cache: 'no-store' });
+    const data = await resp.json();
+    if (!resp.ok || data.status !== 'ok') {
+      throw new Error(data.message || 'Ulaşılamıyor');
+    }
+    elements.pythonStatus.textContent = `CLIP Servisi · ${data.archiveIndexed ?? 'aktif'}`;
+    elements.pythonStatus.classList.remove('warn');
+    elements.pythonStatus.classList.add('ok');
+  } catch (err) {
+    if (elements.pythonStatus) {
+      elements.pythonStatus.textContent = 'CLIP Servisi · ulaşılamıyor';
+      elements.pythonStatus.classList.remove('ok');
+      elements.pythonStatus.classList.add('warn');
+    }
+    console.warn('Ping hatası:', err);
+  }
+}
+
+// Desenler sol panelini dolduran yardımcı (mevcut fonksiyon eksikti)
+function loadFolderList(){
+  try {
+    const folderList = document.getElementById('folder-list');
+    if (!folderList) return;
+    
+    // Eski hatalı localStorage verilerini temizle (12 desen olan kayıtlar)
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('folder_count_')) {
+        const value = localStorage.getItem(key);
+        if (value === '12') {
+          localStorage.removeItem(key); // Yanlış değeri sil
+        }
+      }
+    }
+    
+    // Klasör listesi - başlangıç sayıları ile
+    const folders = [
+      { name: 'Çizgi Desenler', count: 0 },
+      { name: 'Dar Viskon Desenler', count: 139 },
+      { name: 'Ekose Desenler', count: 0 },
+      { name: 'Eteği Sulu Desenler', count: 79 },
+      { name: 'Geniş Viskon Desenler', count: 245 },
+      { name: 'Karma Desenler', count: 0 },
+      { name: 'Leopar Desenler', count: 83 },
+      { name: 'Süet Desenler', count: 251 },
+      { name: 'Şablonu Olan Desenler', count: 0 },
+      { name: 'Turlu Viskon Desenler', count: 395 },
+      { name: 'Yeni Tasarımlar', count: 6 }
+    ];
+    
+    // Klasör HTML'ini oluştur
+    folderList.innerHTML = folders.map(folder => {
+      // localStorage'dan kayıtlı sayıyı al veya başlangıç sayısını kullan
+      const savedCount = localStorage.getItem(`folder_count_${folder.name}`);
+      const count = savedCount ? savedCount : folder.count;
+      const countText = count > 0 ? `(${count} desen)` : '(yükleniyor...)';
+      const countColor = '#00ff00';
+      
+      return `<button class="folder-item ghost" data-folder="${folder.name}" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">
+        ${folder.name} <span style="color:${countColor}; float:right;">${countText}</span>
+      </button>`;
+    }).join('');
+    
+    // Click handler'ları bağla
+    folderList.querySelectorAll('button[data-folder]')
+      .forEach(btn => {
+        const f = btn.getAttribute('data-folder');
+        if (!f) return;
+        btn.addEventListener('click', () => loadFolderGallery(f));
+      });
+    
+    // Yeni Tasarımlar badge'ine de click handler ekle
+    const desenBadge = document.getElementById('yeni-tasarimlar-badge');
+    if (desenBadge) {
+      desenBadge.addEventListener('click', () => loadFolderGallery('Yeni Tasarımlar'));
+    }
+    
+    // Klasör sayılarını yükle (arka planda)
+    updateFolderCounts();
+  } catch(_) {}
+}
+
+// Klasörlerin desen sayılarını güncelleyen fonksiyon (sadece 0 olanlar için)
+async function updateFolderCounts() {
+  try {
+    const folderList = document.getElementById('folder-list');
+    if (!folderList) return;
+    
+    const buttons = folderList.querySelectorAll('button[data-folder]');
+    
+    for (const btn of buttons) {
+      const folderName = btn.getAttribute('data-folder');
+      const span = btn.querySelector('span');
+      
+      if (!span) continue;
+      
+      // Eğer localStorage'da kayıtlı sayı varsa, atla (zaten doğru)
+      const savedCount = localStorage.getItem(`folder_count_${folderName}`);
+      if (savedCount && savedCount !== '0') {
+        continue; // Bu klasör zaten güncellendi, geç
+      }
+      
+      try {
+        // Archive endpoint ile dene (take:10000)
+        const params = new URLSearchParams({ folder: folderName, take: '10000' });
+        const resp = await fetch(`/archive/samples?${params.toString()}`, { cache: 'no-store' });
+        
+        if (resp.ok) {
+          const list = await resp.json();
+          const count = Array.isArray(list) ? list.length : 0;
+          
+          // localStorage'a kaydet
+          localStorage.setItem(`folder_count_${folderName}`, count);
+          
+          span.textContent = `(${count} desen)`;
+          span.style.color = '#00ff00';
+        }
+      } catch (err) {
+        console.error(`${folderName} sayısı yüklenemedi:`, err);
+      }
+    }
+  } catch (err) {
+    console.error('Klasör sayıları güncellenemiyor:', err);
+  }
+}
+
+// Yeni Varyantlar badge'ine handler ekle (global)
+function initVariantBadgeHandler(){
+  const variantBadge = document.getElementById('yeni-varyantlar-badge');
+  if (variantBadge && !variantBadge.dataset.handlerBound) {
+    variantBadge.dataset.handlerBound = 'true';
+    const folderName = variantBadge.getAttribute('data-folder');
+    if (folderName) {
+      variantBadge.addEventListener('click', () => {
+        console.log('Yeni Varyantlar badge tıklandı:', folderName);
+        loadVariantFolder(folderName);
+      });
+    }
+  }
+}
+
+initLogoFromStorage();
+loadArchiveSamples();
+updateStatistics(); // İstatistikleri yükle
+initVariantBadgeHandler(); // Badge handler'ını başlangıçta ekle
+loadFolderList(); // Klasör listesini yükle ve sayıları göster
+// Varsayılan olarak ilk önizlemeyi getir
+// loadCategoryPreview artık kategori kullanmıyor, doğrudan folder bazlı
+
+elements.input.addEventListener('change', () => {
+  const file = elements.input.files?.[0];
+  state.file = file || null;
+  if (!file) {
+    if (elements.analyze) elements.analyze.disabled = true;
+    elements.capturePreview?.removeAttribute?.('src');
+    if (elements.captureLabel) elements.captureLabel.textContent = 'Hazır';
+    if (elements.captureMeta) elements.captureMeta.textContent = '0 KB';
+    return;
+  }
+  if (elements.analyze) elements.analyze.disabled = false;
+  if (elements.captureLabel) elements.captureLabel.textContent = file.name;
+  if (elements.captureMeta) elements.captureMeta.textContent = `${bytesToSize(file.size)} · ${file.type || 'Bilinmiyor'}`;
+  const url = URL.createObjectURL(file);
+  if (elements.capturePreview) elements.capturePreview.src = url;
+});
+
+document.getElementById('capture-btn').addEventListener('click', () => elements.input.click());
+elements.refreshArchive?.addEventListener('click', () => renderArchivePreview());
+elements.refreshGallerySecondary?.addEventListener('click', () => loadArchiveSamples(true));
+elements.logoInput?.addEventListener('change', () => {
+  const file = elements.logoInput.files?.[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) {
+    alert('Logo dosyası 5MB sınırını aşıyor.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const result = e.target?.result;
+    if (typeof result === 'string') {
+      setLogoSource(result, true);
+    }
+  };
+  reader.readAsDataURL(file);
+});
+elements.logoReset?.addEventListener('click', () => setLogoSource(defaultLogoSrc || '', true, true));
+elements.logoFrame?.addEventListener('click', () => toggleLogoModal(true));
+elements.logoClose?.addEventListener('click', () => toggleLogoModal(false));
+elements.logoCloseSecondary?.addEventListener('click', () => toggleLogoModal(false));
+elements.logoModal?.addEventListener('click', evt => {
+  if (evt.target === elements.logoModal) toggleLogoModal(false);
+});
+document.addEventListener('keydown', evt => {
+  if (evt.key === 'Escape') toggleLogoModal(false);
+});
+
+// Sol panel kategori düğmeleri - artık kullanılmıyor (klasör bazlı sistem)
+if (elements.btnDesenler) {
+  elements.btnDesenler.addEventListener('click', () => {
+    console.log('Desenler butonuna tıklandı!');
+    console.log('📊 Mevcut seçimler - Desenler:', state.selectedDesigns.length, 'Varyantlar:', state.selectedVariants.length);
+    elements.btnDesenler.classList.add('active-category');
+    elements.btnDesenler.classList.add('active');
+    elements.btnVaryantlar?.classList.remove('active-category');
+    elements.btnVaryantlar?.classList.remove('active');
+    state.currentCategory = null; // Kategori kullanmıyoruz
+    
+    // localStorage'a kaydet
+    localStorage.setItem('selectedTab', 'desenler');
+    
+    // Varyant klasörlerini temizle ve desen klasörlerini göster
+    const folderList = document.getElementById('folder-list');
+    if (folderList) {
+      folderList.innerHTML = '';
+      console.log('🧹 Varyant klasörleri temizlendi, desen klasörleri yükleniyor');
+    }
+    // Yeni Tasarımlar badge'i göster, Yeni Varyantlar badge'i gizle
+    const desenBadge = document.getElementById('yeni-tasarimlar-badge');
+    if (desenBadge) desenBadge.style.display = 'flex';
+    const variantBadge = document.getElementById('yeni-varyantlar-badge');
+    if (variantBadge) variantBadge.style.display = 'none';
+    
+    loadCategoryGallery(); // Tüm klasörlerden önizleme
+    loadFolderList(); // Desen klasörlerini sol panele yükle
+    updateSelectionUI(); // Seçim sayacını güncelle
+  });
+}
+
+function initVariantBinding(){
+  const btn = document.getElementById('btn-varyantlar');
+  if (!btn) return;
+  if (btn.dataset.bound) return;
+  btn.dataset.bound = '1';
+  const handler = async () => {
+    console.log('📊 Mevcut seçimler - Desenler:', state.selectedDesigns.length, 'Varyantlar:', state.selectedVariants.length);
+    // localStorage'a kaydet
+    localStorage.setItem('selectedTab', 'varyantlar');
+    
+    // Yeni Tasarımlar badge'i gizle, Yeni Varyantlar badge'i göster
+    const desenBadge = document.getElementById('yeni-tasarimlar-badge');
+    if (desenBadge) desenBadge.style.display = 'none';
+    const variantBadge = document.getElementById('yeni-varyantlar-badge');
+    if (variantBadge) variantBadge.style.display = 'flex';
+    
+    // Active class toggle
+    elements.btnVaryantlar?.classList.add('active');
+    elements.btnDesenler?.classList.remove('active');
+    
+    // Active class toggle
+    elements.btnVaryantlar?.classList.add('active');
+    elements.btnDesenler?.classList.remove('active');
+    
+    // Sol paneldeki klasör listesini varyant klasörleriyle doldur
+    await loadVariantFolders();
+    updateSelectionUI(); // Seçim sayacını güncelle
+  };
+  btn.addEventListener('click', handler);
+  window.__vClick = handler;
+  console.log('Varyant butonu bağlandı');
+}
+
+async function loadVariantFolders(){
+  const folderList = document.getElementById('folder-list');
+  if (!folderList) return;
+  folderList.innerHTML = '<div style="padding:20px; text-align:center; color:#4fc3f7;">Varyant klasörleri yükleniyor...</div>';
+  
+  try {
+    // Sunucudan enjekte edilen gerçek klasör listesi; yoksa geriye uyumlu boş liste
+    const variantFolders = Array.isArray(serverVariantFolders) && serverVariantFolders.length
+      ? serverVariantFolders
+      : [];
+    
+    folderList.innerHTML = '';
+    
+    // İstekleri sıraya alarak (sequential) çalıştır; mobilde zaman aşımı riskini azaltır
+    for (const folderName of variantFolders) {
+      const btn = document.createElement('button');
+      btn.className = 'folder-item ghost';
+      btn.dataset.folder = folderName;
+      btn.style.cssText = 'text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px; cursor:pointer; border-radius:6px; margin-bottom:6px;';
+      btn.innerHTML = `${folderName} <span style="color:#00ff00; float:right;">(yükleniyor...)</span>`;
+      btn.addEventListener('click', () => loadVariantFolder(folderName));
+      folderList.appendChild(btn);
+      
+      // Klasör sayısını sırayla al (await) - mobilde daha stabil
+      try { await fetchVariantCount(folderName, btn); } catch(_) {}
+    }
+  } catch(e) {
+    console.error('Varyant klasörleri yüklenemedi:', e);
+    folderList.innerHTML = '<div style="padding:20px; text-align:center; color:#ef5350;">Klasörler yüklenemedi</div>';
+  }
+}
+
+async function fetchVariantCount(folderName, btnElement){
+  try {
+    const list = await fetchVariantsByFolder(folderName);
+    const count = Array.isArray(list) ? list.length : 0;
+    const span = btnElement.querySelector('span');
+    if (span) {
+      span.textContent = `(${count} varyant)`;
+      span.style.color = '#00ff00';
+    }
+  } catch(e) {
+    const span = btnElement.querySelector('span');
+    if (span) {
+      span.textContent = '(0 varyant)';
+      span.style.color = '#00ff00';
+    }
+  }
+}
+
+async function loadVariantFolder(folderName){
+  state.variantSubfolderFilter = null;
+  
+  // localStorage'a son açılan klasörü kaydet
+  localStorage.setItem('lastOpenedFolder', folderName);
+  localStorage.setItem('lastFolderType', 'varyant');
+  
+  const desc = document.getElementById('gallery-description');
+  if (desc) desc.textContent = `${folderName} yükleniyor...`;
+  
+  try {
+    const list = await fetchVariantsByFolder(folderName);
+    state.variants = Array.isArray(list) ? list : [];
+    
+    if (state.variants.length > 0) {
+      // İlk varyantı ana önizlemeye koy
+      setMainPreviewFromItem(state.variants[0]);
+      // Galeriye render et
+      renderVariants(state.variants);
+      if (desc) desc.textContent = `${folderName} · ${state.variants.length} varyant`;
+    } else {
+      if (desc) desc.textContent = `${folderName} · varyant bulunamadı`;
+      const grid = document.getElementById('gallery-grid');
+      if (grid) grid.innerHTML = '<div class="empty-state subtle">Bu klasörde varyant bulunamadı.</div>';
+    }
+    
+    // Aktif klasör vurgusunu güncelle
+    document.querySelectorAll('.folder-item').forEach(b => b.classList.remove('active-folder'));
+    const activeBtn = document.querySelector(`.folder-item[data-folder="${folderName}"]`);
+    if (activeBtn) activeBtn.classList.add('active-folder');
+  } catch(e) {
+    console.error('Klasör yükleme hatası:', e);
+    if (desc) desc.textContent = 'Yükleme hatası';
+    const grid = document.getElementById('gallery-grid');
+    if (grid) grid.innerHTML = `<div class="empty-state subtle">Hata: ${e.message}</div>`;
+  }
+}
+
+function initVariantBindingOLD(){
+  const btn = document.getElementById('btn-varyantlar');
+  if (!btn) return;
+  if (btn.dataset.bound) return;
+  btn.dataset.bound = '1';
+  const handler = async () => {
+    if (state._variantsLoading) {
+      console.log('⏳ Varyant yükleme zaten sürüyor; ikinci çağrı iptal.');
+      return;
+    }
+    state._variantsLoading = true;
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '📁 Yükleniyor…';
+    let resetTimer = setTimeout(() => {
+      // Emniyet: 10 sn sonra butonu eski haline döndür
+      btn.disabled = false;
+      btn.textContent = original;
+    }, 10000);
+    try {
+      console.log('🔵 Varyantlar yükleme başlıyor');
+      const desc = document.getElementById('gallery-description');
+      if (desc) desc.textContent = 'Varyantlar yükleniyor…';
+      
+      // Mevcut ASP.NET backend ile çalışacak basitleştirilmiş akış
+      // Önce mevcut ana görselin varyantlarını dene
+      if (state.mainToken) {
+        await loadVariants();
+      }
+      
+      // Eğer varyant bulunamadıysa, arşivden varyantı kesin olan klasörden örnek al
+      if (!Array.isArray(state.variants) || state.variants.length === 0) {
+        console.warn('⚠️ Ana görsel için varyant bulunamadı, arşivden varyantlı örnek aranıyor...');
+        if (desc) desc.textContent = 'Varyant bulunamadı; alternatif klasör deneniyor…';
+        try {
+          // ŞABLONU OLAN DESENLER klasöründen bir örnek al (bu klasörde varyant garantisi yüksek)
+          const resp = await fetch('/archive/samples?take=1&folder=ŞABLONU%20OLAN%20DESENLER', { cache: 'no-store' });
+          if (resp.ok) {
+            const list = await resp.json();
+            if (Array.isArray(list) && list.length > 0 && list[0]?.token) {
+              console.log('🔍 ŞABLONU OLAN DESENLER klasöründen örnek alındı');
+              setMainPreviewFromItem(list[0]);
+              if (desc) desc.textContent = 'ŞABLONU OLAN DESENLER örneği ile tekrar deneniyor…';
+              await loadVariants();
+              
+              // Hâlâ boşsa Leopar Desenler'den dene
+              if ((!Array.isArray(state.variants) || state.variants.length === 0)) {
+                const resp2 = await fetch('/archive/samples?take=1&folder=Leopar%20Desenler', { cache: 'no-store' });
+                if (resp2.ok) {
+                  const list2 = await resp2.json();
+                  if (Array.isArray(list2) && list2.length > 0 && list2[0]?.token) {
+                    console.log('🔍 Leopar Desenler klasöründen örnek alındı');
+                    setMainPreviewFromItem(list2[0]);
+                    if (desc) desc.textContent = 'Leopar Desenler örneği ile tekrar deneniyor…';
+                    await loadVariants();
+                    // Eğer ASP.NET yine 0 dönerse, FastAPI klasör fallback'ine geç
+                    if (!Array.isArray(state.variants) || state.variants.length === 0) {
+                      console.log('🟡 ASP.NET varyantları boş; FastAPI klasör fallback çağrılıyor');
+                      if (desc) desc.textContent = 'Leopar Varyantları klasörü (FastAPI) deneniyor…';
+                      const fa = await fetchVariantsByFolder('Leopar Desen Varyantları');
+                      if (Array.isArray(fa) && fa.length) {
+                        state.variants = fa;
+                        renderVariants(state.variants);
+                        if (desc) desc.textContent = `Varyantlar · ${state.variants.length} adet önizleme (FastAPI)`;
+                      } else {
+                        if (desc) desc.textContent = 'Varyant bulunamadı — farklı klasör seçin';
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('❌ Yedek akış başarısız', e);
+        }
+      }
+      
+      console.log(`✅ Toplam ${state.variants?.length || 0} adet varyant yüklendi`);
+      if (desc) {
+        if (Array.isArray(state.variants) && state.variants.length) {
+          desc.textContent = `Varyantlar · ${state.variants.length} adet önizleme`;
+        } else {
+          desc.textContent = 'Varyant bulunamadı — farklı klasör seçin';
+        }
+      }
+    } catch(err){
+      console.error('❌ Varyant yükleme hatası', err);
+    } finally {
+      clearTimeout(resetTimer);
+      btn.disabled = false;
+      btn.textContent = original;
+      state._variantsLoading = false;
+    }
+  };
+  btn.addEventListener('click', handler);
+  window.__vClick = handler;
+  console.log('Varyant butonu bağlandı');
+}
+initVariantBinding();
+document.addEventListener('DOMContentLoaded', initVariantBinding);
+
+// 🎯 Film şeridi için mouse sürükle-kaydır özelliği
+function initDragScroll() {
+  const gallery = document.getElementById('gallery-grid');
+  if (!gallery) return;
+  
+  let isDown = false;
+  let startX;
+  let scrollLeft;
+  
+  gallery.addEventListener('mousedown', (e) => {
+    isDown = true;
+    gallery.style.cursor = 'grabbing';
+    gallery.style.userSelect = 'none';
+    startX = e.pageX - gallery.offsetLeft;
+    scrollLeft = gallery.scrollLeft;
+  });
+  
+  gallery.addEventListener('mouseleave', () => {
+    isDown = false;
+    gallery.style.cursor = 'grab';
+  });
+  
+  gallery.addEventListener('mouseup', () => {
+    isDown = false;
+    gallery.style.cursor = 'grab';
+  });
+  
+  gallery.addEventListener('mousemove', (e) => {
+    if (!isDown) return;
+    e.preventDefault();
+    const x = e.pageX - gallery.offsetLeft;
+    const walk = (x - startX) * 2; // Kaydırma hızı çarpanı
+    gallery.scrollLeft = scrollLeft - walk;
+  });
+}
+
+// Sayfa yüklendiğinde son durumu geri yükle
+document.addEventListener('DOMContentLoaded', () => {
+  // Film şeridi sürükle-kaydır başlat
+  initDragScroll();
+  
+  // Son seçilen tab'ı geri yükle
+  const savedTab = localStorage.getItem('selectedTab');
+  const lastFolder = localStorage.getItem('lastOpenedFolder');
+  const lastType = localStorage.getItem('lastFolderType');
+  
+  if (savedTab === 'varyantlar') {
+    // Varyantlar tab'ını aç
+    elements.btnVaryantlar?.click();
+    
+    // Son açılan varyant klasörünü yükle
+    if (lastFolder && lastType === 'varyant') {
+      setTimeout(() => loadVariantFolder(lastFolder), 500);
+    }
+  } else {
+    // Desenler tab'ını aktif yap (varsayılan)
+    elements.btnDesenler?.classList.add('active');
+    
+    // Son açılan desen klasörünü yükle
+    if (lastFolder && lastType === 'desen') {
+      setTimeout(() => loadFolderGallery(lastFolder), 500);
+    }
+  }
+});
+
+// Sol panel diğer butonlar
+elements.searchInput?.addEventListener('input', (e) => {
+  const query = e.target.value.toLowerCase().trim();
+  state.searchQuery = query;
+  
+  // Galeriyi yeniden render et (filtreli)
+  // Not: Sol paneldeki klasörleri FİLTRELEME, sadece galeriyi filtrele
+  renderGallery();
+});
+
+elements.shareBtn?.addEventListener('click', () => {
+  shareGallery();
+});
+
+// Tümünü seç/temizle butonu
+const selectAllBtn = document.getElementById('select-all-btn');
+if (selectAllBtn) {
+  selectAllBtn.addEventListener('click', () => {
+    toggleSelectAll();
+  });
+}
+
+// Etiketten Çıkar butonu
+elements.removeFromTagBtn?.addEventListener('click', () => {
+  if (!state.activeTag) {
+    alert('Aktif etiket bulunamadı!');
+    return;
+  }
+  
+  const selectedItems = state.selectedDesigns;
+  if (selectedItems.length === 0) {
+    alert('Lütfen etiketten çıkarmak istediğiniz desenleri seçin!');
+    return;
+  }
+  
+  // Seçili desenleri etiketten çıkar
+  const taggedItems = state.taggedDesigns[state.activeTag] || [];
+  selectedItems.forEach(item => {
+    const index = taggedItems.findIndex(d => 
+      d.token === item.token && d.fileName === item.fileName
+    );
+    if (index > -1) {
+      taggedItems.splice(index, 1);
+    }
+  });
+  
+  // Güncelle
+  state.taggedDesigns[state.activeTag] = taggedItems;
+  persistTags();
+  
+  // Önce etiket listesini güncelle (rakamlar düşsün)
+  renderTags();
+  
+  // Seçimi temizle
+  state.selectedDesigns = [];
+  
+  // Eğer etiket boşaldıysa normal galeri görünümüne dön
+  if (taggedItems.length === 0) {
+    state.activeTag = null;
+    if (elements.removeFromTagBtn) {
+      elements.removeFromTagBtn.style.display = 'none';
+    }
+    alert('Tüm desenler etiketten çıkarıldı. Normal görünüme dönülüyor.');
+    location.reload(); // Veya loadCategoryGallery() çağır
+  } else {
+    // Etiket görünümünü yenile
+    showTaggedDesigns(state.activeTag);
+  }
+  
+  updateSelectionUI();
+});
+
+elements.refreshBtn?.addEventListener('click', () => {
+  location.reload();
+});
+
+elements.exitBtn?.addEventListener('click', () => {
+  if (confirm('Çıkmak istediğinize emin misiniz?')) {
+    window.close();
+  }
+});
+
+// Klasör listesi butonları
+const folderButtons = document.querySelectorAll('.folder-item');
+console.log(`${folderButtons.length} adet klasör butonu bulundu`);
+folderButtons.forEach((btn, index) => {
+  btn.addEventListener('click', async function() {
+    const folderName = this.dataset.folder;
+    console.log(`Klasör ${index + 1} tıklandı: ${folderName}`);
+    // Görsel highlight
+    folderButtons.forEach(b => b.classList.remove('active-folder'));
+    this.classList.add('active-folder');
+
+    // Eğer bu bir variant-folder-item ise: desen endpoint'lerini çağırma, varyant akışına yönlendir
+    if (this.classList.contains('variant-folder-item')) {
+      try {
+        state.variantSubfolderFilter = folderName;
+        await loadVariantFolder(folderName);
+      } catch (err) {
+        alert('Varyant klasörü yüklenemedi: ' + err);
+      }
+      return; // Variant akışını tamamladık
+    }
+
+    // Normal desen klasörü akışı
+    try {
+      // Tek ana önizleme için 1, gallery için ayrıca çağrı yapılacak
+      const params = new URLSearchParams({ take: '1', folder: folderName });
+      // Kategori artık kullanılmıyor
+      const resp = await fetch(`/archive/samples?${params.toString()}`, { cache: 'no-store' });
+      if (!resp.ok) throw new Error(await resp.text());
+      const list = await resp.json();
+      if (Array.isArray(list) && list.length) {
+        setMainPreviewFromItem(list[0]);
+        // Çoklu önizleme galerisi
+        loadFolderGallery(folderName);
+      } else {
+        alert(`${folderName} klasöründe desen bulunamadı.`);
+      }
+    } catch (err) {
+      alert('Klasör yüklenemedi: ' + err);
+    }
+  });
+});
+
+// Sağ panel: Arşivden Ara butonu
+elements.archiveSearchBtn?.addEventListener('click', () => {
+  alert('🔍 Arşivden Benzerlik Araması\n\n' +
+        '📌 Bu özellik için:\n' +
+        '1. Ana önizlemedeki desene sağ tıklayın\n' +
+        '2. "Resmi farklı kaydet" seçin\n' +
+        '3. "📷 Resimden Ara" butonuna tıklayın\n' +
+        '4. Kaydettiğiniz dosyayı seçin\n\n' +
+        '💡 Böylece bu desenin benzerlerini bulabilirsiniz!');
+});
+
+// Resimden Ara (tek buton): dosya seçtir ve yükle
+async function searchByFile(file) {
+  if (!file) return;
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const resp = await fetch('/api/upload', { method: 'POST', body: fd });
+    if (!resp.ok) throw new Error(await resp.text());
+    const json = await resp.json();
+    const results = Array.isArray(json) ? json : (json.all_results || json.results || []);
+    state.results = results;
+    if (results.length) {
+      const best = results[0];
+      if (best.path) {
+        const token = encodePath(best.path);
+        if (elements.mainPreview) {
+          elements.mainPreview.src = `/archive/image?path=${encodeURIComponent(token)}&v=${Date.now()}`;
+        }
+        if (elements.mainTitle) {
+          const fn = best.path.split('\\').pop() || 'Eşleşme';
+          elements.mainTitle.textContent = `🖼️ Eşleşme · ${fn}`;
+        }
+      }
+    }
+    renderArchivePreview();
+  } catch (err) {
+    alert('Resimden arama başarısız: ' + err);
+  }
+}
+
+elements.searchBtn?.addEventListener('click', () => elements.searchFile?.click());
+elements.searchFile?.addEventListener('change', async () => {
+  const f = elements.searchFile?.files?.[0];
+  if (f) await searchByFile(f);
+});
+
+document.getElementById('analyze-btn').addEventListener('click', async () => {
+  if (!state.file) {
+    alert('Önce telefon kameranızdan fotoğraf çekin.');
+    return;
+  }
+  const fd = new FormData();
+  fd.append('file', state.file);
+  elements.analyze.disabled = true;
+  elements.analyze.textContent = 'Aranıyor…';
+  try {
+    const resp = await fetch('/api/upload', { method: 'POST', body: fd });
+    if (!resp.ok) throw new Error(await resp.text());
+    const json = await resp.json();
+    state.results = json.all_results || [];
+    elements.jsonOutput.textContent = JSON.stringify(json, null, 2);
+    renderResults();
+    if (state.results.length) selectResult(0); else clearMatch();
+  } catch (err) {
+    alert('Arama sırasında hata oluştu:\n' + err);
+  } finally {
+    elements.analyze.disabled = false;
+    elements.analyze.textContent = 'Aramayı Başlat';
+  }
+});
+
+function clearMatch() {
+  if (elements.matchLabel) elements.matchLabel.textContent = 'Eşleşme bulunamadı';
+  if (elements.matchMeta) elements.matchMeta.textContent = '';
+  if (elements.matchScore) elements.matchScore.textContent = '0%';
+  elements.matchPreview?.removeAttribute?.('src');
+  renderArchivePreview();
+}
+
+function renderResults() {
+  if (!elements.resultList) {
+    // Sonuç listesi DOM'da yoksa sadece küçük önizlemeyi güncelle
+    renderArchivePreview();
+    return;
+  }
+  elements.resultList.innerHTML = '';
+  if (!state.results.length) {
+    elements.resultList.innerHTML = '<div class="empty-state">Arama tamamlandı fakat eşleşme bulunamadı.</div>';
+    renderArchivePreview();
+    return;
+  }
+  state.results.forEach((result, index) => {
+    const item = document.createElement('div');
+    item.className = 'result-item' + (state.selected === index ? ' active' : '');
+    item.innerHTML = `
+      <div style="display:flex; justify-content:space-between;">
+        <strong>${result.path?.split('\\').pop() || 'Bilinmeyen'}</strong>
+        <span class="score">${Math.round((result.score || 0)*100)}%</span>
+      </div>
+      <small>${result.path || ''}</small>
+    `;
+    item.addEventListener('click', () => selectResult(index));
+    elements.resultList.appendChild(item);
+  });
+  renderArchivePreview();
+}
+
+function selectResult(index) {
+  state.selected = index;
+  renderResults();
+  const result = state.results[index];
+  if (!result) return;
+  if (elements.matchLabel) elements.matchLabel.textContent = result.path?.split('\\').pop() || 'Desen';
+  if (elements.matchMeta) elements.matchMeta.textContent = result.path || '';
+  if (elements.matchScore) elements.matchScore.textContent = `${Math.round((result.score || 0)*100)}%`;
+  if (result.path) {
+    try {
+      const token = encodePath(result.path);
+      if (elements.matchPreview) elements.matchPreview.src = `/archive/image?path=${encodeURIComponent(token)}&v=${Date.now()}`;
+    } catch {
+      elements.matchPreview?.removeAttribute?.('src');
+    }
+  }
+}
+
+function setLogoSource(src, persist = false, clear = false) {
+  if (!src && !clear && defaultLogoSrc) src = defaultLogoSrc;
+  if (elements.sideLogo && src) elements.sideLogo.src = src;
+  if (elements.logoPreview && src) elements.logoPreview.src = src;
+  try {
+    if (persist) {
+      if (clear) localStorage.removeItem(logoStorageKey);
+      else localStorage.setItem(logoStorageKey, src);
+    }
+  } catch (err) {
+    console.warn('Logo kaydedilemedi', err);
+  }
+}
+
+function initLogoFromStorage() {
+  try {
+    const stored = localStorage.getItem(logoStorageKey);
+    if (stored) setLogoSource(stored);
+  } catch {
+    // localStorage devre dışı bırakılmış olabilir
+  }
+}
+
+async function loadArchiveSamples(showSpinner = false) {
+  if (!elements.galleryGrid) return;
+  if (showSpinner) {
+    elements.galleryGrid.innerHTML = '<div class="empty-state subtle">Arşiv yeniden taranıyor...</div>';
+  }
+
+  try {
+    const resp = await fetch('/archive/samples?take=12', { cache: 'no-store' });
+    if (!resp.ok) throw new Error(await resp.text());
+    const list = await resp.json();
+    state.gallery = Array.isArray(list) ? list : [];
+    renderGallery();
+    if (!state.mainToken && state.gallery.length) {
+      setMainPreviewFromItem(state.gallery[0]);
+      autoLoadVariants();
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : err;
+    state.gallery = [];
+    elements.galleryGrid.innerHTML = `<div class="empty-state subtle">Arşiv okunamadı:<br>${message}</div>`;
+  }
+}
+
+async function loadCategoryPreview(category) {
+  console.log(`loadCategoryPreview çağrıldı, category: "${category}"`);
+  try {
+    const params = new URLSearchParams({ take: '1' });
+    if (category) params.append('category', category);
+    const url = `/archive/samples?${params.toString()}`;
+    console.log(`Fetch URL: ${url}`);
+    const resp = await fetch(url, { cache: 'no-store' });
+    console.log(`Fetch response status: ${resp.status}`);
+    if (!resp.ok) throw new Error(await resp.text());
+    const list = await resp.json();
+    console.log('Fetch response data:', list);
+    if (Array.isArray(list) && list.length) {
+      console.log('setMainPreviewFromItem çağrılıyor, item:', list[0]);
+      setMainPreviewFromItem(list[0]);
+    } else {
+      console.warn('Arşivde kayıt bulunamadı');
+      alert('Arşivde gösterilecek kayıt bulunamadı.');
+    }
+  } catch (err) {
+    console.error('loadCategoryPreview hatası:', err);
+    alert('Arşiv yüklenemedi: ' + err);
+  }
+}
+
+async function loadCategoryGallery(category) {
+  try {
+    // Etiket görünümünden çıkıyoruz
+    state.activeTag = null;
+    if (elements.removeFromTagBtn) {
+      elements.removeFromTagBtn.style.display = 'none';
+    }
+    
+    const params = new URLSearchParams({ take: '24' });
+    // Kategori artık kullanılmıyor, tüm klasörlerden yükle
+    const resp = await fetch(`/archive/samples?${params.toString()}`, { cache: 'no-store' });
+    if (!resp.ok) throw new Error(await resp.text());
+    const list = await resp.json();
+    state.gallery = Array.isArray(list) ? list : [];
+    renderGallery();
+    if (elements.galleryDescription) elements.galleryDescription.textContent = `Tüm Desenler · ${state.gallery.length} adet önizleme`;
+    if (!state.mainToken && state.gallery.length) {
+      setMainPreviewFromItem(state.gallery[0]);
+      autoLoadVariants();
+    }
+  } catch (err) {
+    if (elements.galleryDescription) elements.galleryDescription.textContent = 'Galeri yüklenemedi';
+  }
+}
+
+async function loadFolderGallery(folder) {
+  try {
+    // Etiket görünümünden çıkıyoruz
+    state.activeTag = null;
+    if (elements.removeFromTagBtn) {
+      elements.removeFromTagBtn.style.display = 'none';
+    }
+    
+    state.subfolderFilter = null;
+    
+    // localStorage'a son açılan klasörü kaydet
+    localStorage.setItem('lastOpenedFolder', folder);
+    localStorage.setItem('lastFolderType', 'desen');
+    
+    const params = new URLSearchParams({ take: '10000', folder });
+    // Kategori kullanılmıyor
+    const resp = await fetch(`/archive/samples?${params.toString()}`, { cache: 'no-store' });
+    if (!resp.ok) throw new Error(await resp.text());
+    const list = await resp.json();
+    state.gallery = Array.isArray(list) ? list : [];
+    renderGallery();
+    if (elements.galleryDescription) elements.galleryDescription.textContent = `${folder} · ${state.gallery.length} adet önizleme`;
+    // Alt klasörler listesi
+    renderSubfoldersFromGallery();
+    if (!state.mainToken && state.gallery.length) {
+      setMainPreviewFromItem(state.gallery[0]);
+      autoLoadVariants();
+    }
+  } catch (err) {
+    if (elements.galleryDescription) elements.galleryDescription.textContent = 'Klasör galerisi yüklenemedi';
+  }
+}
+
+function setMainPreviewFromItem(item) {
+  console.log('setMainPreviewFromItem çağrıldı, item:', item);
+  if (!item) {
+    console.warn('Item boş!');
+    return;
+  }
+  try {
+    if (elements.mainPreview && item.token) {
+      const imgUrl = `/archive/image?path=${encodeURIComponent(item.token)}&v=${Date.now()}`;
+      console.log('Görsel URL:', imgUrl);
+      console.log('mainPreview element:', elements.mainPreview);
+      elements.mainPreview.src = imgUrl;
+      elements.mainPreview.onerror = () => console.error('Ana önizleme yüklenemedi:', elements.mainPreview.src);
+      elements.mainPreview.onload = () => console.log('Ana önizleme yüklendi');
+      state.mainToken = item.token || null;
+    } else {
+      console.warn('mainPreview veya token eksik:', { 
+        hasMainPreview: !!elements.mainPreview, 
+        hasToken: !!item.token,
+        token: item.token 
+      });
+    }
+    if (elements.mainTitle) {
+      const title = `🖼️ ${item.fileName || 'Önizleme'}`;
+      console.log('Başlık güncelleniyor:', title);
+      elements.mainTitle.textContent = title;
+    } else {
+      console.warn('mainTitle element bulunamadı');
+    }
+  } catch (err) {
+    console.error('setMainPreviewFromItem hatası:', err);
+  }
+}
+
+// Varyantlar
+async function loadVariants() {
+  const strip = document.getElementById('variants-strip');
+  const countEl = document.getElementById('variants-count');
+  
+  if (!state.mainToken) {
+    // Otomatik ana görsel seçimi: mevcut galeriden ya da tek örnekten
+    if (Array.isArray(state.gallery) && state.gallery.length) {
+      setMainPreviewFromItem(state.gallery[0]);
+    } else {
+      try {
+        const r = await fetch('/archive/samples?take=1', { cache: 'no-store' });
+        if (r.ok) {
+          const arr = await r.json();
+          if (Array.isArray(arr) && arr.length) setMainPreviewFromItem(arr[0]);
+        }
+      } catch {}
+    }
+    if (!state.mainToken) {
+      console.warn('Ana token yok, varyantlar yüklenemiyor');
+      return;
+    }
+  }
+  
+  if (strip) strip.innerHTML = '<div class="empty-state subtle">Varyantlar yükleniyor…</div>';
+  if (countEl) countEl.textContent = '';
+  
+  try {
+    console.log('📦 Varyantlar API çağrısı yapılıyor...');
+    const params = new URLSearchParams({ path: state.mainToken, take: '24' });
+    const resp = await fetch(`/archive/variants?${params.toString()}`, { cache: 'no-store' });
+    if (!resp.ok) throw new Error(await resp.text());
+    const list = await resp.json();
+    state.variants = Array.isArray(list) ? list : [];
+    console.log('✅ Varyantlar yüklendi:', state.variants.length, 'adet');
+    
+    if (strip) renderVariants(state.variants);
+    renderVariantLeftSubfolders(); // Sol paneli her zaman güncelle
+  } catch (err) {
+    console.error('❌ Varyant yükleme hatası:', err);
+    if (strip) strip.innerHTML = `<div class="empty-state subtle">Varyantlar yüklenemedi:<br>${err}</div>`;
+  }
+}
+
+async function fetchVariantsByFolder(folderName){
+  try {
+    // ASP.NET endpoint - desenler gibi 80 portu üzerinden
+    const apiUrl = '/archive/variants-by-folder?' + new URLSearchParams({ folder: folderName }).toString();
+    const resp = await fetch(apiUrl, { cache: 'no-store' });
+    if (!resp.ok) throw new Error(await resp.text());
+    const list = await resp.json();
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    console.warn('Varyant yükleme hatası:', e);
+    return [];
+  }
+}
+
+function renderVariants(items) {
+  // Varyantları çoklu önizleme galerisinde göster
+  const strip = document.getElementById('gallery-grid');
+  const descEl = document.getElementById('gallery-description');
+  
+  if (!strip) {
+    console.warn('⚠️ gallery-grid bulunamadı');
+    return;
+  }
+  
+  // Apply subfolder filter
+  let data = Array.isArray(items) ? items : [];
+  if (state.variantSubfolderFilter) {
+    data = data.filter(x => (x.folder || '').toLowerCase() === state.variantSubfolderFilter.toLowerCase());
+  }
+  
+  strip.innerHTML = '';
+  if (descEl) descEl.textContent = data?.length ? `Varyantlar · ${data.length} adet önizleme` : 'Varyantlar';
+  
+  // Alt klasörleri ÖNCE render et (veri olsun olmasın)
+  renderVariantSubfoldersToGallery(items);
+  
+  if (!Array.isArray(data) || !data.length) {
+    strip.innerHTML = '<div class="empty-state subtle">Bu desen için varyant bulunamadı.</div>';
+    return;
+  }
+  
+  data.forEach((v, i) => {
+    const isSelected = state.selectedVariants.some(x => x.token === v.token);
+    
+    const tile = document.createElement('div');
+    tile.className = 'gallery-item';
+    tile.style.position = 'relative';
+    tile.style.minWidth = '110px';
+    tile.style.flexShrink = '0';
+    tile.style.cursor = 'pointer';
+    tile.dataset.token = v.token;
+    
+    // Checkbox
+    const checkboxWrapper = document.createElement('div');
+    checkboxWrapper.style.position = 'absolute';
+    checkboxWrapper.style.top = '4px';
+    checkboxWrapper.style.left = '4px';
+    checkboxWrapper.style.zIndex = '10';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'design-checkbox';
+    checkbox.dataset.token = v.token;
+    checkbox.checked = isSelected;
+    checkbox.style.width = '20px';
+    checkbox.style.height = '20px';
+    checkbox.style.cursor = 'pointer';
+    checkbox.style.accentColor = '#9c27b0';
+    
+    checkbox.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleVariantSelection(v);
+    });
+    
+    checkboxWrapper.appendChild(checkbox);
+    tile.appendChild(checkboxWrapper);
+    
+    // Resim
+    if (v.token) {
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.alt = v.fileName || `Varyant ${i+1}`;
+      img.src = `/archive/image?path=${encodeURIComponent(v.token)}&v=${Date.now()+i}`;
+      img.style.width = '100%';
+      img.style.height = '100px';
+      img.style.objectFit = 'cover';
+      img.style.borderRadius = '4px';
+      img.style.border = isSelected ? '2px solid #9c27b0' : '1px solid #ddd';
+      img.style.boxShadow = isSelected ? '0 0 0 2px #9c27b0' : 'none';
+      tile.appendChild(img);
+    }
+    
+    // Dosya adı
+    const label = document.createElement('div');
+    label.style.marginTop = '4px';
+    label.style.fontSize = '11px';
+    label.style.color = '#333';
+    label.style.textAlign = 'center';
+    label.style.whiteSpace = 'nowrap';
+    label.style.overflow = 'hidden';
+    label.style.textOverflow = 'ellipsis';
+    label.textContent = v.fileName || `Varyant ${i+1}`;
+    tile.appendChild(label);
+    
+    tile.addEventListener('click', () => setMainPreviewFromItem({ token: v.token, fileName: v.fileName, folder: v.folder }));
+    strip.appendChild(tile);
+  });
+  
+  // Seçim UI'ını güncelle
+  updateSelectionUI();
+  
+  console.log(`✅ ${data.length} adet varyant görseli render edildi`);
+}
+
+function autoLoadVariants(){
+  const strip = document.getElementById('variants-strip');
+  if (!state.mainToken || !strip) return;
+  if (strip.children.length === 0) {
+    loadVariants();
+  }
+}
+
+function renderVariantSubfolders(items){
+  const host = document.getElementById('variants-subfolders');
+  if (!host) return;
+  host.innerHTML = '';
+  const source = Array.isArray(items) && items.length ? items : (Array.isArray(state.variants) ? state.variants : []);
+  const names = [...new Set(source.map(x => (x.folder||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+  if (!names.length) return;
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.className = 'pill';
+  clearBtn.textContent = 'Tümü';
+  clearBtn.addEventListener('click', () => { state.variantSubfolderFilter = null; renderVariants(source); highlightActiveVariantSubfolder(); });
+  host.appendChild(clearBtn);
+  names.forEach(n => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pill';
+    b.textContent = n;
+    b.dataset.name = n;
+    b.addEventListener('click', () => { state.variantSubfolderFilter = n; renderVariants(source); highlightActiveVariantSubfolder(); });
+    host.appendChild(b);
+  });
+  highlightActiveVariantSubfolder();
+}
+
+// Varyantların alt klasörlerini Çoklu Önizleme alanındaki `subfolders-list` içine bas
+function renderVariantSubfoldersToGallery(items){
+  const host = document.getElementById('subfolders-list');
+  if (!host) return;
+  host.innerHTML = '';
+  const source = Array.isArray(items) && items.length ? items : (Array.isArray(state.variants) ? state.variants : []);
+  const names = [...new Set(source.map(x => (x.folder||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+  console.log('📂 Varyant alt klasörleri:', names);
+  if (!names.length) return;
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.className = 'pill';
+  clearBtn.textContent = 'Tümü';
+  clearBtn.addEventListener('click', () => { state.variantSubfolderFilter = null; renderVariants(state.variants); highlightActiveVariantSubfolderGallery(); });
+  host.appendChild(clearBtn);
+  names.forEach(n => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pill';
+    b.textContent = n;
+    b.dataset.name = n;
+    b.addEventListener('click', () => { state.variantSubfolderFilter = n; renderVariants(state.variants); highlightActiveVariantSubfolderGallery(); });
+    host.appendChild(b);
+  });
+  highlightActiveVariantSubfolderGallery();
+}
+
+function highlightActiveVariantSubfolderGallery(){
+  const host = document.getElementById('subfolders-list');
+  if (!host) return;
+  host.querySelectorAll('button.pill').forEach(btn => {
+    const active = (!btn.dataset.name && !state.variantSubfolderFilter) || (btn.dataset.name && btn.dataset.name.toLowerCase() === (state.variantSubfolderFilter||'').toLowerCase());
+    btn.style.background = active ? 'rgba(59,130,246,.35)' : '';
+    btn.style.borderColor = active ? 'rgba(59,130,246,.6)' : '';
+  });
+}
+
+function highlightActiveVariantSubfolder(){
+  const host = document.getElementById('variants-subfolders');
+  if (!host) return;
+  host.querySelectorAll('button.pill').forEach(btn => {
+    const active = (!btn.dataset.name && !state.variantSubfolderFilter) || (btn.dataset.name && btn.dataset.name.toLowerCase() === (state.variantSubfolderFilter||'').toLowerCase());
+    btn.style.background = active ? 'rgba(59,130,246,.35)' : '';
+    btn.style.borderColor = active ? 'rgba(59,130,246,.6)' : '';
+  });
+}
+
+// Sol panelde alt klasörleri (varyant) göster - desen klasörlerinin altına ekle
+function renderVariantLeftSubfolders(){
+  // Bu fonksiyon artık devre dışı - sol panelde varyant klasörleri gösterme
+  console.log('ℹ️ renderVariantLeftSubfolders devre dışı bırakıldı');
+  return;
+}
+
+// Tam ekran işlevleri
+function openFullscreen(){
+  if (!elements.mainPreview?.src) return;
+  if (elements.fullscreenImg) elements.fullscreenImg.src = elements.mainPreview.src;
+  elements.fullscreenOverlay?.classList.add('open');
+}
+function closeFullscreen(){
+  elements.fullscreenOverlay?.classList.remove('open');
+  if (elements.fullscreenImg) elements.fullscreenImg.removeAttribute('src');
+}
+elements.fullscreenClose?.addEventListener('click', closeFullscreen);
+elements.mainPreview?.addEventListener('dblclick', openFullscreen);
+elements.fullscreenImg?.addEventListener('dblclick', closeFullscreen);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeFullscreen();
+  if (e.key.toLowerCase() === 'f') {
+    if (elements.fullscreenOverlay?.classList.contains('open')) closeFullscreen(); else openFullscreen();
+  }
+  // Navigasyon sadece tam ekrandayken
+  if (elements.fullscreenOverlay?.classList.contains('open')) {
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      navigateFullscreen(1);
+    }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      navigateFullscreen(-1);
+    }
+  }
+});
+function navigateFullscreen(dir){
+  console.log('Navigate:', dir, 'Gallery length:', state.gallery?.length, 'Main token:', state.mainToken);
+  if (!Array.isArray(state.gallery) || !state.gallery.length) {
+    console.warn('Galeri boş veya yüklenmemiş');
+    return;
+  }
+  const idxCurrent = state.gallery.findIndex(x => x.token === state.mainToken);
+  console.log('Current index:', idxCurrent);
+  if (idxCurrent === -1) {
+    console.warn('Mevcut resim galeride bulunamadı');
+    return;
+  }
+  let next = (idxCurrent + dir + state.gallery.length) % state.gallery.length;
+  const item = state.gallery[next];
+  console.log('Next item:', item);
+  setMainPreviewFromItem(item);
+  if (elements.fullscreenOverlay?.classList.contains('open') && elements.fullscreenImg) {
+    elements.fullscreenImg.src = `/archive/image?path=${encodeURIComponent(item.token)}&v=${Date.now()}`;
+  }
+}
+elements.fullscreenOverlay?.addEventListener('click', e => { if (e.target === elements.fullscreenOverlay) closeFullscreen(); });
+
+function renderGallery() {
+  if (!elements.galleryGrid) return;
+  elements.galleryGrid.innerHTML = '';
+  let items = Array.isArray(state.gallery) ? state.gallery : [];
+  
+  // Alt klasör filtresi
+  if (state.subfolderFilter) {
+    items = items.filter(x => (x.folder || '').toLowerCase() === state.subfolderFilter.toLowerCase());
+  }
+  
+  // Arama filtresi
+  if (state.searchQuery && state.searchQuery.length >= 2) {
+    items = items.filter(item => {
+      const fileName = (item.fileName || '').toLowerCase();
+      const folder = (item.folder || '').toLowerCase();
+      const numara = (item.numara || '').toLowerCase();
+      const etiketler = (item.etiketler || '').toLowerCase();
+      
+      return fileName.includes(state.searchQuery) || 
+             folder.includes(state.searchQuery) || 
+             numara.includes(state.searchQuery) || 
+             etiketler.includes(state.searchQuery);
+    });
+  }
+  
+  if (!items.length) {
+    const msg = state.searchQuery ? `"${state.searchQuery}" için sonuç bulunamadı.` : 'Arşivde görüntülenecek desen bulunamadı.';
+    elements.galleryGrid.innerHTML = `<div class="empty-state subtle">${msg}</div>`;
+    return;
+  }
+
+  items.forEach(item => {
+    const isSelected = state.selectedDesigns.some(x => x.token === item.token);
+    
+    const tile = document.createElement('div');
+    tile.className = 'gallery-item';
+    tile.style.position = 'relative';
+    tile.style.minWidth = '110px';
+    tile.style.flexShrink = '0';
+    tile.style.cursor = 'pointer';
+    tile.dataset.token = item.token;
+    
+    // Checkbox
+    const checkboxWrapper = document.createElement('div');
+    checkboxWrapper.style.position = 'absolute';
+    checkboxWrapper.style.top = '4px';
+    checkboxWrapper.style.left = '4px';
+    checkboxWrapper.style.zIndex = '10';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'design-checkbox';
+    checkbox.dataset.token = item.token;
+    checkbox.checked = isSelected;
+    checkbox.style.width = '20px';
+    checkbox.style.height = '20px';
+    checkbox.style.cursor = 'pointer';
+    checkbox.style.accentColor = '#007bff';
+    
+    checkbox.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleDesignSelection(item);
+    });
+    
+    checkboxWrapper.appendChild(checkbox);
+    tile.appendChild(checkboxWrapper);
+    
+    // Resim
+    if (item.token) {
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.alt = item.fileName || 'Desen';
+      img.src = `/archive/image?path=${encodeURIComponent(item.token)}&v=${Date.now()}`;
+      img.style.width = '100%';
+      img.style.height = '100px';
+      img.style.objectFit = 'cover';
+      img.style.borderRadius = '4px';
+      img.style.border = isSelected ? '2px solid #007bff' : '1px solid #ddd';
+      img.style.boxShadow = isSelected ? '0 0 0 2px #007bff' : 'none';
+      tile.appendChild(img);
+    }
+    
+    // Dosya adı
+    const label = document.createElement('div');
+    label.style.marginTop = '4px';
+    label.style.fontSize = '11px';
+    label.style.color = '#333';
+    label.style.textAlign = 'center';
+    label.style.whiteSpace = 'nowrap';
+    label.style.overflow = 'hidden';
+    label.style.textOverflow = 'ellipsis';
+    label.textContent = item.fileName || 'Desen';
+    tile.appendChild(label);
+    
+    // Ana önizlemeye tıklama
+    tile.addEventListener('click', () => setMainPreviewFromItem(item));
+    
+    elements.galleryGrid.appendChild(tile);
+  });
+  
+  // Seçim UI'ını güncelle
+  updateSelectionUI();
+  
+  // Film şeridi için sürükle-kaydır yeniden başlat
+  initDragScroll();
+}
+
+function renderSubfoldersFromGallery(){
+  const host = document.getElementById('subfolders-list');
+  if (!host) return;
+  host.innerHTML = '';
+  const items = Array.isArray(state.gallery) ? state.gallery : [];
+  const names = [...new Set(items.map(x => (x.folder||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+  if (!names.length) return;
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.className = 'pill';
+  clearBtn.textContent = 'Tümü';
+  clearBtn.addEventListener('click', () => { state.subfolderFilter = null; renderGallery(); highlightActiveSubfolder(); });
+  host.appendChild(clearBtn);
+  names.forEach(n => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pill';
+    b.textContent = n;
+    b.dataset.name = n;
+    b.addEventListener('click', () => { state.subfolderFilter = n; renderGallery(); highlightActiveSubfolder(); });
+    host.appendChild(b);
+  });
+  highlightActiveSubfolder();
+}
+
+function highlightActiveSubfolder(){
+  const host = document.getElementById('subfolders-list');
+  if (!host) return;
+  host.querySelectorAll('button.pill').forEach(btn => {
+    const active = (!btn.dataset.name && !state.subfolderFilter) || (btn.dataset.name && btn.dataset.name.toLowerCase() === (state.subfolderFilter||'').toLowerCase());
+    btn.style.background = active ? 'rgba(59,130,246,.35)' : '';
+    btn.style.borderColor = active ? 'rgba(59,130,246,.6)' : '';
+  });
+}
+
+// Etiket ekleme işlevi
+function renderTags() {
+  if (!elements.tagList) return;
+  if (!state.tags.length) {
+    elements.tagList.innerHTML = '<div class="empty-state subtle">Henüz etiket eklenmedi</div>';
+    return;
+  }
+  elements.tagList.innerHTML = '';
+  state.tags.forEach((tag) => {
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.alignItems = 'center';
+    row.style.gap = '8px';
+    row.style.marginBottom = '8px';
+    
+    const pill = document.createElement('button');
+    pill.className = 'pill';
+    pill.style.cursor = 'pointer';
+    pill.style.flex = '1';
+    pill.style.textAlign = 'left';
+    
+    const taggedCount = state.taggedDesigns[tag] ? state.taggedDesigns[tag].length : 0;
+    pill.textContent = `${tag} ${taggedCount > 0 ? `(${taggedCount})` : ''}`;
+    
+    // Etikete tıklandığında o etiketteki desenleri göster
+    pill.addEventListener('click', () => {
+      showTaggedDesigns(tag);
+    });
+    
+    const addSelectedBtn = document.createElement('button');
+    addSelectedBtn.type = 'button';
+    addSelectedBtn.className = 'ghost';
+    addSelectedBtn.style.padding = '4px 8px';
+    addSelectedBtn.style.fontSize = '.7rem';
+    addSelectedBtn.style.whiteSpace = 'nowrap';
+    addSelectedBtn.textContent = '+ Seçilileri Ekle';
+    addSelectedBtn.addEventListener('click', () => {
+      addSelectedDesignsToTag(tag);
+    });
+    
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'ghost';
+    removeBtn.style.padding = '4px 8px';
+    removeBtn.style.fontSize = '.7rem';
+    removeBtn.textContent = 'Sil';
+    removeBtn.addEventListener('click', () => {
+      const index = state.tags.indexOf(tag);
+      if (index > -1) {
+        state.tags.splice(index, 1);
+        delete state.taggedDesigns[tag]; // Etiketle ilişkili desenleri de sil
+        persistTags();
+        renderTags();
+      }
+    });
+    
+    row.appendChild(pill);
+    row.appendChild(addSelectedBtn);
+    row.appendChild(removeBtn);
+    elements.tagList.appendChild(row);
+  });
+}
+
+// Seçili desenleri etikete ekle
+function addSelectedDesignsToTag(tag) {
+  // Her iki tab'dan da seçimleri topla
+  const allSelectedItems = [...state.selectedDesigns, ...state.selectedVariants];
+  
+  if (allSelectedItems.length === 0) {
+    alert('Lütfen önce desen veya varyant seçin!');
+    return;
+  }
+  
+  // Etiket için desen listesi yoksa oluştur
+  if (!state.taggedDesigns[tag]) {
+    state.taggedDesigns[tag] = [];
+  }
+  
+  // Tüm seçili öğeleri ekle (tekrar eklenmemesi için kontrol)
+  allSelectedItems.forEach(item => {
+    const exists = state.taggedDesigns[tag].some(d => 
+      d.token === item.token && d.fileName === item.fileName
+    );
+    if (!exists) {
+      state.taggedDesigns[tag].push({
+        token: item.token,
+        fileName: item.fileName,
+        folder: item.folder,
+        numara: item.numara
+      });
+    }
+  });
+  
+  persistTags();
+  renderTags();
+  
+  // Her iki tab'ın seçimlerini de temizle
+  state.selectedDesigns = [];
+  state.selectedVariants = [];
+  
+  // Aktif tab'ı yeniden render et
+  const isVariantsTab = elements.btnVaryantlar?.classList.contains('active');
+  if (isVariantsTab) {
+    renderVariants(state.variants);
+  } else {
+    renderGallery();
+  }
+  
+  updateSelectionUI();
+}
+
+// Etiketli desenleri göster
+function showTaggedDesigns(tag) {
+  const taggedItems = state.taggedDesigns[tag] || [];
+  
+  if (taggedItems.length === 0) {
+    alert(`"${tag}" etiketine henüz desen eklenmemiş.`);
+    return;
+  }
+  
+  // Aktif etiketi kaydet
+  state.activeTag = tag;
+  
+  // Gallery'yi etiketli desenlerle doldur
+  state.gallery = taggedItems;
+  state.subfolderFilter = null;
+  state.searchQuery = ''; // Arama filtresini temizle, tüm etiketli desenleri göster
+  
+  // Desenler tabına geç
+  if (elements.btnVaryantlar?.classList.contains('active')) {
+    elements.btnVaryantlar.classList.remove('active');
+    elements.btnDesenler?.classList.add('active');
+  }
+  
+  // Ana başlığı güncelle
+  if (elements.mainTitle) {
+    elements.mainTitle.textContent = `🏷️ ${tag} (${taggedItems.length} desen)`;
+  }
+  
+  // Etiketten çıkar butonunu göster
+  if (elements.removeFromTagBtn) {
+    elements.removeFromTagBtn.style.display = 'block';
+  }
+  
+  renderGallery();
+  updateStats();
+}
+
+function addTag() {
+  const val = elements.tagInput?.value?.trim();
+  if (!val) return;
+  if (state.tags.includes(val)) {
+    alert('Bu etiket zaten eklenmiş');
+    return;
+  }
+  state.tags.push(val);
+  persistTags();
+  elements.tagInput.value='';
+  renderTags();
+}
+
+elements.addTagBtn?.addEventListener('click', addTag);
+elements.tagInput?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); }});
+renderTags();
+
+// Tag persistence
+const tagStorageKey = 'tasarim.tags';
+const taggedDesignsStorageKey = 'tasarim.taggedDesigns';
+
+function persistTags(){
+  try { 
+    localStorage.setItem(tagStorageKey, JSON.stringify(state.tags));
+    localStorage.setItem(taggedDesignsStorageKey, JSON.stringify(state.taggedDesigns));
+  } catch {}
+}
+
+function loadTags(){
+  try {
+    const raw = localStorage.getItem(tagStorageKey);
+    if (raw){
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) { state.tags = arr.filter(x => typeof x === 'string').slice(0,200); }
+    }
+    
+    const rawTaggedDesigns = localStorage.getItem(taggedDesignsStorageKey);
+    if (rawTaggedDesigns) {
+      const obj = JSON.parse(rawTaggedDesigns);
+      if (obj && typeof obj === 'object') {
+        state.taggedDesigns = obj;
+      }
+    }
+  } catch {}
+  renderTags();
+}
+loadTags();
+
+// PDF oluşturma - Görünen galeri içeriğini kullan
+async function generatePdf(){
+  try {
+    // Hangi tab aktif kontrol et
+    const isVariantsTab = elements.btnVaryantlar?.classList.contains('active');
+    const items = isVariantsTab ? state.selectedVariants : state.selectedDesigns;
+    
+    if (items.length === 0) {
+      alert(isVariantsTab 
+        ? 'Lütfen önce PDF oluşturmak istediğiniz varyantları seçin!'
+        : 'Lütfen önce PDF oluşturmak istediğiniz desenleri seçin!');
+      return;
+    }
+    
+    const pdfTitle = state.searchQuery 
+      ? `Arama: "${state.searchQuery}" (${items.length} seçili ${isVariantsTab ? 'varyant' : 'desen'})`
+      : state.subfolderFilter 
+        ? `${state.subfolderFilter} (${items.length} seçili ${isVariantsTab ? 'varyant' : 'desen'})`
+        : `Seçili ${isVariantsTab ? 'Varyantlar' : 'Desenler'} (${items.length} adet)`;
+    
+    const body = {
+      title: pdfTitle,
+      tags: state.tags,
+      selectedFileName: elements.mainTitle?.textContent?.replace('🖼️ ','') || null,
+      category: state.currentCategory,
+      folder: document.querySelector('.folder-item.active-folder')?.dataset.folder || null,
+      selectedToken: state.mainToken,
+      galleryItems: items.map(item => ({
+        fileName: item.fileName,
+        folder: item.folder,
+        numara: item.numara,
+        token: item.token
+      }))
+    };
+    
+    const resp = await fetch('/api/pdf', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (!resp.ok) throw new Error(await resp.text());
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `desen_raporu_${Date.now()}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+  } catch(err){
+    alert('PDF oluşturulamadı: '+ err);
+  }
+}
+
+// Desen seçim/seçim kaldırma
+function toggleDesignSelection(item) {
+  const index = state.selectedDesigns.findIndex(x => x.token === item.token);
+  
+  if (index >= 0) {
+    // Zaten seçili - kaldır
+    state.selectedDesigns.splice(index, 1);
+  } else {
+    // Seç
+    state.selectedDesigns.push({
+      token: item.token,
+      fileName: item.fileName,
+      folder: item.folder,
+      numara: item.numara,
+      etiketler: item.etiketler
+    });
+  }
+  
+  // Galeriyi yeniden render et (checkbox durumlarını güncelle)
+  renderGallery();
+  updateSelectionUI();
+}
+
+// Varyant seçim/seçim kaldırma
+function toggleVariantSelection(item) {
+  const index = state.selectedVariants.findIndex(x => x.token === item.token);
+  
+  if (index >= 0) {
+    // Zaten seçili - kaldır
+    state.selectedVariants.splice(index, 1);
+  } else {
+    // Seç
+    state.selectedVariants.push({
+      token: item.token,
+      fileName: item.fileName,
+      folder: item.folder
+    });
+  }
+  
+  // Varyantları yeniden render et (checkbox durumlarını güncelle)
+  renderVariants(state.variants);
+  updateSelectionUI();
+}
+
+// Tümünü seç/seçimi temizle
+function toggleSelectAll() {
+  // Hangi tab aktif kontrol et
+  const isVariantsTab = elements.btnVaryantlar?.classList.contains('active');
+  
+  if (isVariantsTab) {
+    // Varyantlar tab'ı
+    let items = Array.isArray(state.variants) ? state.variants : [];
+    
+    if (state.variantSubfolderFilter) {
+      items = items.filter(x => (x.folder || '').toLowerCase() === state.variantSubfolderFilter.toLowerCase());
+    }
+    
+    if (state.searchQuery && state.searchQuery.length >= 2) {
+      items = items.filter(item => {
+        const fileName = (item.fileName || '').toLowerCase();
+        const folder = (item.folder || '').toLowerCase();
+        
+        return fileName.includes(state.searchQuery) || 
+               folder.includes(state.searchQuery);
+      });
+    }
+    
+    // Tümü seçili mi kontrol et
+    const allSelected = items.length > 0 && items.every(item => 
+      state.selectedVariants.some(x => x.token === item.token)
+    );
+    
+    if (allSelected) {
+      // Seçimi temizle
+      state.selectedVariants = [];
+    } else {
+      // Tümünü seç
+      state.selectedVariants = items.map(item => ({
+        token: item.token,
+        fileName: item.fileName,
+        folder: item.folder
+      }));
+    }
+    
+    renderVariants(state.variants);
+  } else {
+    // Desenler tab'ı
+    let items = Array.isArray(state.gallery) ? state.gallery : [];
+    
+    if (state.subfolderFilter) {
+      items = items.filter(x => (x.folder || '').toLowerCase() === state.subfolderFilter.toLowerCase());
+    }
+    
+    if (state.searchQuery && state.searchQuery.length >= 2) {
+      items = items.filter(item => {
+        const fileName = (item.fileName || '').toLowerCase();
+        const folder = (item.folder || '').toLowerCase();
+        const numara = (item.numara || '').toLowerCase();
+        const etiketler = (item.etiketler || '').toLowerCase();
+        
+        return fileName.includes(state.searchQuery) || 
+               folder.includes(state.searchQuery) || 
+               numara.includes(state.searchQuery) || 
+               etiketler.includes(state.searchQuery);
+      });
+    }
+    
+    // Tümü seçili mi kontrol et
+    const allSelected = items.length > 0 && items.every(item => 
+      state.selectedDesigns.some(x => x.token === item.token)
+    );
+    
+    if (allSelected) {
+      // Seçimi temizle
+      state.selectedDesigns = [];
+    } else {
+      // Tümünü seç
+      state.selectedDesigns = items.map(item => ({
+        token: item.token,
+        fileName: item.fileName,
+        folder: item.folder,
+        numara: item.numara,
+        etiketler: item.etiketler
+      }));
+    }
+    
+    renderGallery();
+  }
+  
+  updateSelectionUI();
+}
+
+// Seçim UI'ını güncelle (buton durumları, sayaç)
+function updateSelectionUI() {
+  // Hangi tab aktif kontrol et
+  const isVariantsTab = elements.btnVaryantlar?.classList.contains('active');
+  const count = isVariantsTab ? state.selectedVariants.length : state.selectedDesigns.length;
+  const selectionInfo = document.getElementById('selection-info');
+  const selectAllBtn = document.getElementById('select-all-btn');
+  
+  if (selectionInfo) {
+    if (count > 0) {
+      selectionInfo.textContent = isVariantsTab 
+        ? `${count} varyant seçildi` 
+        : `${count} desen seçildi`;
+      selectionInfo.style.display = 'block';
+    } else {
+      selectionInfo.style.display = 'none';
+    }
+  }
+  
+  // Paylaş butonunu aktif/pasif yap
+  if (elements.shareBtn) {
+    elements.shareBtn.disabled = count === 0;
+    elements.shareBtn.style.opacity = count === 0 ? '0.5' : '1';
+    elements.shareBtn.style.cursor = count === 0 ? 'not-allowed' : 'pointer';
+  }
+  
+  // Etiketten Çıkar butonunu aktif/pasif yap (sadece etiket görünümünde)
+  if (elements.removeFromTagBtn && state.activeTag) {
+    elements.removeFromTagBtn.disabled = count === 0;
+    elements.removeFromTagBtn.style.opacity = count === 0 ? '0.5' : '1';
+    elements.removeFromTagBtn.style.cursor = count === 0 ? 'not-allowed' : 'pointer';
+  }
+  
+  // Tümünü seç butonunun metnini güncelle
+  if (selectAllBtn) {
+    let items, allSelected;
+    
+    if (isVariantsTab) {
+      items = Array.isArray(state.variants) ? state.variants : [];
+      
+      if (state.variantSubfolderFilter) {
+        items = items.filter(x => (x.folder || '').toLowerCase() === state.variantSubfolderFilter.toLowerCase());
+      }
+      
+      if (state.searchQuery && state.searchQuery.length >= 2) {
+        items = items.filter(item => {
+          const fileName = (item.fileName || '').toLowerCase();
+          const folder = (item.folder || '').toLowerCase();
+          
+          return fileName.includes(state.searchQuery) || 
+                 folder.includes(state.searchQuery);
+        });
+      }
+      
+      allSelected = items.length > 0 && items.every(item => 
+        state.selectedVariants.some(x => x.token === item.token)
+      );
+    } else {
+      items = Array.isArray(state.gallery) ? state.gallery : [];
+      
+      if (state.subfolderFilter) {
+        items = items.filter(x => (x.folder || '').toLowerCase() === state.subfolderFilter.toLowerCase());
+      }
+      
+      if (state.searchQuery && state.searchQuery.length >= 2) {
+        items = items.filter(item => {
+          const fileName = (item.fileName || '').toLowerCase();
+          const folder = (item.folder || '').toLowerCase();
+          const numara = (item.numara || '').toLowerCase();
+          const etiketler = (item.etiketler || '').toLowerCase();
+          
+          return fileName.includes(state.searchQuery) || 
+                 folder.includes(state.searchQuery) || 
+                 numara.includes(state.searchQuery) || 
+                 etiketler.includes(state.searchQuery);
+        });
+      }
+      
+      allSelected = items.length > 0 && items.every(item => 
+        state.selectedDesigns.some(x => x.token === item.token)
+      );
+    }
+    
+    selectAllBtn.textContent = allSelected ? '❌ Seçimi Temizle' : '☑️ Tümünü Seç';
+  }
+}
+
+// Mobil paylaşım (WhatsApp, Mail, vb.)
+async function shareGallery() {
+  try {
+    // Hangi tab aktif kontrol et
+    const isVariantsTab = elements.btnVaryantlar?.classList.contains('active');
+    const items = isVariantsTab ? state.selectedVariants : state.selectedDesigns;
+    
+    if (items.length === 0) {
+      alert(isVariantsTab 
+        ? 'Lütfen önce paylaşmak istediğiniz varyantları seçin!'
+        : 'Lütfen önce paylaşmak istediğiniz desenleri seçin!');
+      return;
+    }
+    
+    // WhatsApp başlık
+    const shareTitle = state.searchQuery 
+      ? `${isVariantsTab ? 'Varyant' : 'Desen'} Arama: "${state.searchQuery}"`
+      : state.subfolderFilter 
+        ? `${state.subfolderFilter} ${isVariantsTab ? 'Varyantları' : 'Desenleri'}`
+        : isVariantsTab ? 'Varyant Koleksiyonu' : 'Desen Koleksiyonu';
+    
+    let whatsappMessage = `*${shareTitle}*\n\n${items.length} adet ${isVariantsTab ? 'varyant' : 'desen'}:\n\n`;
+    
+    // Her resim için base64 fetche et ve mesaja ekle
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const baseUrl = window.location.origin;
+      const imageUrl = `${baseUrl}/archive/image/${encodeURIComponent(item.folder)}/${encodeURIComponent(item.fileName)}`;
+      
+      try {
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+          const base64 = e.target.result.split(',')[1];
+          // Base64 resim linki oluştur (data URL)
+          whatsappMessage += `${i+1}. ${item.fileName}\n[Resim](data:image/jpeg;base64,${base64.substring(0, 100)}...)\n\n`;
+        };
+        reader.readAsDataURL(blob);
+      } catch (e) {
+        console.error(`Resim yüklenemedi: ${item.fileName}`, e);
+        whatsappMessage += `${i+1}. ${item.fileName}\n[Yüklenemedi]\n\n`;
+      }
+    }
+    
+    // WhatsApp'a aç
+    const whatsappText = encodeURIComponent(whatsappMessage);
+    window.open(`https://wa.me/?text=${whatsappText}`, '_blank');
+    
+  } catch(err) {
+    console.error('Paylaşım hatası:', err);
+    alert('Paylaşım yapılamadı: ' + err.message);
+  }
+}
+
+function focusGalleryItem(item) {
+  if (!item) return;
+  elements.matchLabel.textContent = item.fileName || 'Arşiv Deseni';
+  elements.matchMeta.textContent = item.folder ? item.folder : (item.path || '');
+  elements.matchScore.textContent = 'Arşiv';
+  if (item.token) {
+    elements.matchPreview.src = `/archive/image?path=${encodeURIComponent(item.token)}&v=${Date.now()}`;
+  }
+}
+
+function renderArchivePreview() {
+  if (!elements.archiveGrid) return;
+  elements.archiveGrid.innerHTML = '';
+  const subset = state.results.slice(0, 6);
+  if (!subset.length) {
+    elements.archiveGrid.innerHTML = '<div class="empty-state subtle">Arama sonrasında ilk altı eşleşme burada görünecek.</div>';
+    return;
+  }
+  subset.forEach((result, index) => {
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'archive-item' + (state.selected === index ? ' active' : '');
+    if (result.path) {
+      try {
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.alt = 'Arşiv desen önizlemesi';
+        img.src = `/archive/image?path=${encodeURIComponent(encodePath(result.path))}&v=${Date.now() + index}`;
+        tile.appendChild(img);
+      } catch {
+        // ignore broken preview
+      }
+    }
+    const label = document.createElement('div');
+    label.className = 'archive-item-label';
+    label.textContent = result.path?.split('\\').pop() || `Desen ${index + 1}`;
+    tile.appendChild(label);
+    tile.addEventListener('click', () => selectResult(index));
+    elements.archiveGrid.appendChild(tile);
+  });
+}
+
+async function updateStatistics() {
+  try {
+    // Klasör sayısını al
+    const foldersResp = await fetch('/archive/folders', { cache: 'no-store' });
+    if (foldersResp.ok) {
+      const folders = await foldersResp.json();
+      const folderCount = Array.isArray(folders) ? folders.length : 0;
+      const statFolders = document.getElementById('stat-folders');
+      if (statFolders) statFolders.textContent = folderCount;
+    }
+    // Varyant klasör sayısı
+    const statVariantFolders = document.getElementById('stat-variant-folders');
+    if (statVariantFolders) statVariantFolders.textContent = (serverVariantFolders?.length || 0);
+    
+    // Toplam desen sayısını al
+    const designsResp = await fetch('/archive/samples?take=10000', { cache: 'no-store' });
+    if (designsResp.ok) {
+      const designs = await designsResp.json();
+      const designCount = Array.isArray(designs) ? designs.length : 0;
+      const statDesigns = document.getElementById('stat-designs');
+      if (statDesigns) statDesigns.textContent = designCount;
+    }
+    
+    // Varyant toplam görsel sayısını hesapla (tüm klasörlerdeki jpg/png)
+    const statVariants = document.getElementById('stat-variants');
+    if (statVariants) statVariants.textContent = '...';
+    let totalVariants = 0;
+    const folders = Array.isArray(serverVariantFolders) ? serverVariantFolders : [];
+    for (const name of folders) {
+      try {
+        const url = '/archive/variants-by-folder?' + new URLSearchParams({ folder: name, limit: '10000' }).toString();
+        const resp = await fetch(url, { cache: 'no-store' });
+        if (!resp.ok) continue;
+        const list = await resp.json();
+        totalVariants += Array.isArray(list) ? list.length : 0;
+        if (statVariants) statVariants.textContent = totalVariants; // artarak güncelle
+      } catch { /* yoksay */ }
+    }
+    if (statVariants) statVariants.textContent = totalVariants;
+  } catch (err) {
+    console.warn('İstatistikler yüklenemedi:', err);
+  }
+}
+
+renderArchivePreview();
+</script>
+</body>
+</html>
