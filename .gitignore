@@ -27,5 +27,8 @@ api_startup.log
 .desenler_cache.json
 .varyantlar_cache.json
 
+## Tags data (sunucuda paylaşılan)
+# tags_data.json dosyasını sunucuda tutuyoruz, git'e eklenmemeli
+
 ## DLL files (zaten var olanlar hariç tutulabilir)
 # Gerekirse silip tekrar ekleyin

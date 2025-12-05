@@ -1,0 +1,22 @@
+{
+  "tags": [
+    "Test",
+    "Test2"
+  ],
+  "taggedDesigns": {
+    "Test": [
+      {
+        "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcVkFSWUFOVCAtIMWeYWJsb251IE9sYW4gRGVzZW5sZXJcRXRuaWsgRGVzZW4gVmFyeWFudGxhcsSxXDIwMjM2LmpwZw==",
+        "fileName": "20236.jpg",
+        "folder": "Etnik Desen Varyantları"
+      }
+    ],
+    "Test2": [
+      {
+        "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcS2FyYWtvw6cgVGFzYXLEsW1sYXJcRGFyIFZpc2tvbiBEZXNlbmxlclxULTEwNjAuanBn",
+        "fileName": "T-1060.jpg",
+        "folder": "Dar Viskon Desenler"
+      }
+    ]
+  }
+}

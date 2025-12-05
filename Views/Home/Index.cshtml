@@ -528,8 +528,14 @@
         <button class="primary" type="button" id="add-tag-btn" style="width:100%; margin-bottom:20px;">➕ Ekle (Enter)</button>
         
         <h3 style="font-size:14px; margin-bottom:10px;">Mevcut Etiketler</h3>
-        <div id="tag-list" style="display:flex; flex-direction:column; gap:8px;">
-          <div class="empty-state subtle">Henüz etiket eklenmedi</div>
+        <select id="tag-combobox" style="width:100%; padding:8px; font-size:14px; border-radius:6px; border:1px solid #1976d2; background:#fff; color:#000; margin-bottom:10px;">
+          <option value="">-- Etiket seçin --</option>
+        </select>
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <button class="ghost" type="button" id="tag-add-selected-btn" style="flex:1; font-size:.85rem;">+ Seçilileri Ekle</button>
+          <button class="ghost" type="button" id="tag-delete-btn" style="padding:8px 12px; font-size:.85rem;">🗑️ Sil</button>
+        </div>
+        <div id="tag-list" style="display:none;">
         </div>
       </div>
       
@@ -687,6 +693,9 @@ function getElements() {
     tagInput: document.getElementById('new-tag-input'),
     addTagBtn: document.getElementById('add-tag-btn'),
     tagList: document.getElementById('tag-list'),
+    tagCombobox: document.getElementById('tag-combobox'),
+    tagAddSelectedBtn: document.getElementById('tag-add-selected-btn'),
+    tagDeleteBtn: document.getElementById('tag-delete-btn'),
     fullscreenOverlay: document.getElementById('fullscreen-overlay'),
     fullscreenImg: document.getElementById('fullscreen-img'),
     fullscreenClose: document.getElementById('fullscreen-close'),
@@ -1259,7 +1268,7 @@ if (selectAllBtn) {
 }
 
 // Etiketten Çıkar butonu
-elements.removeFromTagBtn?.addEventListener('click', () => {
+elements.removeFromTagBtn?.addEventListener('click', async () => {
   if (!state.activeTag) {
     alert('Aktif etiket bulunamadı!');
     return;
@@ -1284,7 +1293,7 @@ elements.removeFromTagBtn?.addEventListener('click', () => {
   
   // Güncelle
   state.taggedDesigns[state.activeTag] = taggedItems;
-  persistTags();
+  await persistTags();
   
   // Önce etiket listesini güncelle (rakamlar düşsün)
   renderTags();
@@ -2091,69 +2100,25 @@ function highlightActiveSubfolder(){
 
 // Etiket ekleme işlevi
 function renderTags() {
-  if (!elements.tagList) return;
-  if (!state.tags.length) {
-    elements.tagList.innerHTML = '<div class="empty-state subtle">Henüz etiket eklenmedi</div>';
-    return;
-  }
-  elements.tagList.innerHTML = '';
+  if (!elements.tagCombobox) return;
+  
+  // Combobox'ı güncelle
+  elements.tagCombobox.innerHTML = '<option value="">-- Etiket seçin --</option>';
+  
   state.tags.forEach((tag) => {
-    const row = document.createElement('div');
-    row.style.display = 'flex';
-    row.style.alignItems = 'center';
-    row.style.gap = '8px';
-    row.style.marginBottom = '8px';
-    
-    const pill = document.createElement('button');
-    pill.className = 'pill';
-    pill.style.cursor = 'pointer';
-    pill.style.flex = '1';
-    pill.style.textAlign = 'left';
-    
     const taggedCount = state.taggedDesigns[tag] ? state.taggedDesigns[tag].length : 0;
-    pill.textContent = `${tag} ${taggedCount > 0 ? `(${taggedCount})` : ''}`;
-    
-    // Etikete tıklandığında o etiketteki desenleri göster
-    pill.addEventListener('click', () => {
-      showTaggedDesigns(tag);
-    });
-    
-    const addSelectedBtn = document.createElement('button');
-    addSelectedBtn.type = 'button';
-    addSelectedBtn.className = 'ghost';
-    addSelectedBtn.style.padding = '4px 8px';
-    addSelectedBtn.style.fontSize = '.7rem';
-    addSelectedBtn.style.whiteSpace = 'nowrap';
-    addSelectedBtn.textContent = '+ Seçilileri Ekle';
-    addSelectedBtn.addEventListener('click', () => {
-      addSelectedDesignsToTag(tag);
-    });
-    
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'ghost';
-    removeBtn.style.padding = '4px 8px';
-    removeBtn.style.fontSize = '.7rem';
-    removeBtn.textContent = 'Sil';
-    removeBtn.addEventListener('click', () => {
-      const index = state.tags.indexOf(tag);
-      if (index > -1) {
-        state.tags.splice(index, 1);
-        delete state.taggedDesigns[tag]; // Etiketle ilişkili desenleri de sil
-        persistTags();
-        renderTags();
-      }
-    });
-    
-    row.appendChild(pill);
-    row.appendChild(addSelectedBtn);
-    row.appendChild(removeBtn);
-    elements.tagList.appendChild(row);
+    const option = document.createElement('option');
+    option.value = tag;
+    option.textContent = `${tag} ${taggedCount > 0 ? `(${taggedCount})` : ''}`;
+    elements.tagCombobox.appendChild(option);
   });
+  
+  // İstatistikleri güncelle
+  updateStatistics();
 }
 
 // Seçili desenleri etikete ekle
-function addSelectedDesignsToTag(tag) {
+async function addSelectedDesignsToTag(tag) {
   // Her iki tab'dan da seçimleri topla
   const allSelectedItems = [...state.selectedDesigns, ...state.selectedVariants];
   
@@ -2182,7 +2147,7 @@ function addSelectedDesignsToTag(tag) {
     }
   });
   
-  persistTags();
+  await persistTags();
   renderTags();
   
   // Her iki tab'ın seçimlerini de temizle
@@ -2234,53 +2199,113 @@ function showTaggedDesigns(tag) {
   }
   
   renderGallery();
-  updateStats();
+  updateStatistics();
 }
 
-function addTag() {
+async function addTag() {
   const val = elements.tagInput?.value?.trim();
   if (!val) return;
-  if (state.tags.includes(val)) {
+  // İlk harf büyük, diğerleri küçük
+  const formatted = val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
+  if (state.tags.includes(formatted)) {
     alert('Bu etiket zaten eklenmiş');
     return;
   }
-  state.tags.push(val);
-  persistTags();
+  state.tags.push(formatted);
+  await persistTags();
   elements.tagInput.value='';
   renderTags();
 }
 
 elements.addTagBtn?.addEventListener('click', addTag);
 elements.tagInput?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); }});
-renderTags();
 
-// Tag persistence
-const tagStorageKey = 'tasarim.tags';
-const taggedDesignsStorageKey = 'tasarim.taggedDesigns';
+// Combobox'tan etikete tıklayınca o etiketi göster
+elements.tagCombobox?.addEventListener('change', (e) => {
+  const selectedTag = e.target.value;
+  if (selectedTag) {
+    showTaggedDesigns(selectedTag);
+  }
+});
 
-function persistTags(){
-  try { 
-    localStorage.setItem(tagStorageKey, JSON.stringify(state.tags));
-    localStorage.setItem(taggedDesignsStorageKey, JSON.stringify(state.taggedDesigns));
-  } catch {}
-}
+// Seçilileri combobox'taki etikete ekle
+elements.tagAddSelectedBtn?.addEventListener('click', async () => {
+  const selectedTag = elements.tagCombobox?.value;
+  if (!selectedTag) {
+    alert('Lütfen önce bir etiket seçin!');
+    return;
+  }
+  await addSelectedDesignsToTag(selectedTag);
+});
 
-function loadTags(){
-  try {
-    const raw = localStorage.getItem(tagStorageKey);
-    if (raw){
-      const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) { state.tags = arr.filter(x => typeof x === 'string').slice(0,200); }
-    }
-    
-    const rawTaggedDesigns = localStorage.getItem(taggedDesignsStorageKey);
-    if (rawTaggedDesigns) {
-      const obj = JSON.parse(rawTaggedDesigns);
-      if (obj && typeof obj === 'object') {
-        state.taggedDesigns = obj;
+// Combobox'taki etiketi sil
+elements.tagDeleteBtn?.addEventListener('click', async () => {
+  const selectedTag = elements.tagCombobox?.value;
+  if (!selectedTag) {
+    alert('Lütfen önce bir etiket seçin!');
+    return;
+  }
+  if (confirm(`"${selectedTag}" etiketini silmek istediğinize emin misiniz?`)) {
+    const index = state.tags.indexOf(selectedTag);
+    if (index > -1) {
+      state.tags.splice(index, 1);
+      delete state.taggedDesigns[selectedTag];
+      await persistTags();
+      renderTags();
+      // Eğer silinen etiket gösteriliyorsa, ana galeriyi göster
+      if (state.activeTag === selectedTag) {
+        state.activeTag = null;
+        if (elements.removeFromTagBtn) {
+          elements.removeFromTagBtn.style.display = 'none';
+        }
+        loadFolderGallery(state.currentFolder || variantFolders[0]);
       }
     }
-  } catch {}
+  }
+});
+
+renderTags();
+
+// Tag persistence - Sunucuya kaydet
+// window.location.hostname kullanarak farklı bilgisayarlardan erişimi sağla
+const TAGS_API_URL = `http://${window.location.hostname}:8001/tags`;
+
+async function persistTags(){
+  try {
+    // Sunucuya kaydet
+    const response = await fetch(`${TAGS_API_URL}/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tags: state.tags,
+        taggedDesigns: state.taggedDesigns
+      })
+    });
+    
+    if (!response.ok) {
+      console.error('Etiketler sunucuya kaydedilemedi');
+    }
+  } catch (error) {
+    console.error('Etiket kaydetme hatası:', error);
+  }
+}
+
+async function loadTags(){
+  try {
+    // Sunucudan yükle
+    const response = await fetch(`${TAGS_API_URL}/get`);
+    if (response.ok) {
+      const data = await response.json();
+      if (Array.isArray(data.tags)) {
+        state.tags = data.tags.filter(x => typeof x === 'string').slice(0,200);
+      }
+      if (data.taggedDesigns && typeof data.taggedDesigns === 'object') {
+        state.taggedDesigns = data.taggedDesigns;
+      }
+    }
+  } catch (error) {
+    console.error('Etiketler yüklenemedi:', error);
+  }
   renderTags();
 }
 loadTags();
@@ -2692,6 +2717,19 @@ async function updateStatistics() {
       } catch { /* yoksay */ }
     }
     if (statVariants) statVariants.textContent = totalVariants;
+    
+    // Etiketli desen sayısını hesapla
+    let taggedCount = 0;
+    if (state.taggedDesigns && typeof state.taggedDesigns === 'object') {
+      Object.values(state.taggedDesigns).forEach(designs => {
+        if (Array.isArray(designs)) {
+          taggedCount += designs.length;
+        }
+      });
+    }
+    const statTagged = document.getElementById('stat-tagged');
+    if (statTagged) statTagged.textContent = taggedCount;
+    
   } catch (err) {
     console.warn('İstatistikler yüklenemedi:', err);
   }

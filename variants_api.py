@@ -3,9 +3,10 @@ import base64
 import json
 from pathlib import Path
 from urllib.parse import quote
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from typing import List, Dict
 
 app = FastAPI()
 
@@ -21,6 +22,19 @@ app.add_middleware(
 # Ortamdan veya defaulttan root yolu al
 VARYANT_ROOT = os.environ.get("VARYANT_KLASORU", r"\\192.168.1.36\TasarımVeSablonuOlanDesenler\VARYANT - Şablonu Olan Desenler")
 DESEN_ROOT = os.environ.get("DESEN_KLASORU", r"\\192.168.1.36\TasarımVeSablonuOlanDesenler\Karakoç Tasarımlar")
+
+# Etiketler için JSON dosya yolu
+TAGS_FILE = Path(__file__).parent / "tags_data.json"
+
+def load_tags_data():
+    """Etiket verilerini yükle"""
+    if TAGS_FILE.exists():
+        try:
+            with open(TAGS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return {"tags": [], "taggedDesigns": {}}
 
 def encode_path(p: str) -> str:
     # ASP.NET tarafında kullanılan tokenlarla uyumlu olacak şekilde Base64
@@ -151,4 +165,28 @@ def get_varyantlar_cache(folder: str = Query(None)):
         
     except Exception as e:
         return JSONResponse({"error": f"Cache okuma hatası: {str(e)}"}, status_code=500)
+
+@app.get("/tags/get")
+def get_tags():
+    """Tüm etiketleri ve etiketlenmiş desenleri getir"""
+    try:
+        data = load_tags_data()
+        return JSONResponse(data)
+    except Exception as e:
+        return JSONResponse({"error": f"Etiketler yüklenemedi: {str(e)}"}, status_code=500)
+
+@app.post("/tags/save")
+def save_tags(tags: List[str] = Body(...), taggedDesigns: Dict[str, List[dict]] = Body(...)):
+    """Etiketleri ve etiketlenmiş desenleri kaydet"""
+    try:
+        data = {
+            "tags": tags,
+            "taggedDesigns": taggedDesigns
+        }
+        with open(TAGS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return JSONResponse({"success": True, "message": "Etiketler kaydedildi"})
+    except Exception as e:
+        return JSONResponse({"error": f"Etiketler kaydedilemedi: {str(e)}"}, status_code=500)
+
 
