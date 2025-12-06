@@ -636,6 +636,7 @@ const state = {
   selected: null,
   gallery: [],
   currentCategory: null,
+  viewMode: 'design',
   tags: [],
   taggedDesigns: {}, // { 'etiketAdı': [{token, fileName, folder, numara}, ...] }
   activeTag: null, // Şu anda görüntülenen etiket
@@ -643,10 +644,15 @@ const state = {
   subfolderFilter: null,
   variantSubfolderFilter: null,
   variants: [],
+  variantFolders: [],
+  variantCache: {},
+  variantSearchResults: [],
+  variantSearchSeq: 0,
   _variantsLoading: false,
   searchQuery: '', // Arama query'si
   selectedDesigns: [], // Seçili desenler: {token, fileName, folder, numara}
-  selectedVariants: [] // Seçili varyantlar
+  selectedVariants: [], // Seçili varyantlar
+  tagLookup: {} // Token -> etiket listesi
 };
 // Element referanslarını lazy olarak al (DOM hazır olduğunda)
 const elements = {};
@@ -935,6 +941,7 @@ if (elements.btnDesenler) {
     elements.btnVaryantlar?.classList.remove('active-category');
     elements.btnVaryantlar?.classList.remove('active');
     state.currentCategory = null; // Kategori kullanmıyoruz
+    state.viewMode = 'design';
     
     // localStorage'a kaydet
     localStorage.setItem('selectedTab', 'desenler');
@@ -966,6 +973,7 @@ function initVariantBinding(){
     console.log('📊 Mevcut seçimler - Desenler:', state.selectedDesigns.length, 'Varyantlar:', state.selectedVariants.length);
     // localStorage'a kaydet
     localStorage.setItem('selectedTab', 'varyantlar');
+    state.viewMode = 'variant';
     
     // Yeni Tasarımlar badge'i gizle, Yeni Varyantlar badge'i göster
     const desenBadge = document.getElementById('yeni-tasarimlar-badge');
@@ -983,6 +991,7 @@ function initVariantBinding(){
     
     // Sol paneldeki klasör listesini varyant klasörleriyle doldur
     await loadVariantFolders();
+    await autoLoadDefaultVariantFolder();
     updateSelectionUI(); // Seçim sayacını güncelle
   };
   btn.addEventListener('click', handler);
@@ -1000,6 +1009,7 @@ async function loadVariantFolders(){
     const variantFolders = Array.isArray(serverVariantFolders) && serverVariantFolders.length
       ? serverVariantFolders
       : [];
+    state.variantFolders = variantFolders;
     
     folderList.innerHTML = '';
     
@@ -1022,9 +1032,29 @@ async function loadVariantFolders(){
   }
 }
 
+async function autoLoadDefaultVariantFolder(force = false){
+  if (!force && Array.isArray(state.variants) && state.variants.length) return;
+  const lastFolder = localStorage.getItem('lastOpenedFolder');
+  const lastType = localStorage.getItem('lastFolderType');
+  let candidate = null;
+  if (lastFolder && lastType === 'varyant') {
+    candidate = lastFolder;
+  } else if (Array.isArray(state.variantFolders) && state.variantFolders.length) {
+    candidate = state.variantFolders[0];
+  }
+  if (candidate) {
+    try {
+      await loadVariantFolder(candidate);
+    } catch (err) {
+      console.warn('Varsayılan varyant klasörü yüklenemedi:', err);
+    }
+  }
+}
+
 async function fetchVariantCount(folderName, btnElement){
   try {
     const list = await fetchVariantsByFolder(folderName);
+    cacheVariantFolderData(folderName, list);
     const count = Array.isArray(list) ? list.length : 0;
     const span = btnElement.querySelector('span');
     if (span) {
@@ -1042,6 +1072,7 @@ async function fetchVariantCount(folderName, btnElement){
 
 async function loadVariantFolder(folderName){
   state.variantSubfolderFilter = null;
+  state.viewMode = 'variant';
   
   // localStorage'a son açılan klasörü kaydet
   localStorage.setItem('lastOpenedFolder', folderName);
@@ -1051,14 +1082,21 @@ async function loadVariantFolder(folderName){
   if (desc) desc.textContent = `${folderName} yükleniyor...`;
   
   try {
-    const list = await fetchVariantsByFolder(folderName);
+    const list = await getVariantsFromCacheOrFetch(folderName);
     state.variants = Array.isArray(list) ? list : [];
+    if (!state.searchQuery) {
+      state.variantSearchResults = [];
+    }
     
     if (state.variants.length > 0) {
       // İlk varyantı ana önizlemeye koy
       setMainPreviewFromItem(state.variants[0]);
       // Galeriye render et
-      renderVariants(state.variants);
+      if (state.viewMode === 'variant' && state.searchQuery && state.searchQuery.length >= 1) {
+        await performVariantSearch(state.searchQuery, true);
+      } else {
+        renderVariants(state.variants);
+      }
       if (desc) desc.textContent = `${folderName} · ${state.variants.length} varyant`;
     } else {
       if (desc) desc.textContent = `${folderName} · varyant bulunamadı`;
@@ -1246,13 +1284,27 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Sol panel diğer butonlar
-elements.searchInput?.addEventListener('input', (e) => {
-  const query = e.target.value.toLowerCase().trim();
-  state.searchQuery = query;
-  
-  // Galeriyi yeniden render et (filtreli)
-  // Not: Sol paneldeki klasörleri FİLTRELEME, sadece galeriyi filtrele
-  renderGallery();
+elements.searchInput?.addEventListener('input', async (e) => {
+  const query = e.target.value || '';
+  state.searchQuery = query.toLowerCase().trim();
+  const hasSearch = state.searchQuery.length >= 1;
+  const isVariantActive = state.viewMode === 'variant' || elements.btnVaryantlar?.classList.contains('active');
+  const isDesignActive = !isVariantActive || elements.btnDesenler?.classList.contains('active');
+  if (isDesignActive) {
+    renderGallery();
+  }
+  if (isVariantActive) {
+    if (!Array.isArray(state.variants) || !state.variants.length) {
+      await autoLoadDefaultVariantFolder(true);
+    }
+    if (hasSearch) {
+      await performVariantSearch(state.searchQuery);
+    } else {
+      state.variantSearchSeq += 1; // İnce aramaları iptal et
+      state.variantSearchResults = [];
+      renderVariants(state.variants);
+    }
+  }
 });
 
 elements.shareBtn?.addEventListener('click', () => {
@@ -1571,6 +1623,7 @@ async function loadCategoryGallery(category) {
     if (elements.removeFromTagBtn) {
       elements.removeFromTagBtn.style.display = 'none';
     }
+    state.viewMode = 'design';
     
     const params = new URLSearchParams({ take: '24' });
     // Kategori artık kullanılmıyor, tüm klasörlerden yükle
@@ -1596,6 +1649,7 @@ async function loadFolderGallery(folder) {
     if (elements.removeFromTagBtn) {
       elements.removeFromTagBtn.style.display = 'none';
     }
+    state.viewMode = 'design';
     
     state.subfolderFilter = null;
     
@@ -1714,6 +1768,83 @@ async function fetchVariantsByFolder(folderName){
   }
 }
 
+function cacheVariantFolderData(folderName, list){
+  if (!folderName) return;
+  if (!state.variantCache || typeof state.variantCache !== 'object') {
+    state.variantCache = {};
+  }
+  state.variantCache[folderName] = Array.isArray(list) ? list : [];
+}
+
+async function getVariantsFromCacheOrFetch(folderName){
+  if (!folderName) return [];
+  if (state.variantCache && Array.isArray(state.variantCache[folderName])) {
+    return state.variantCache[folderName];
+  }
+  const list = await fetchVariantsByFolder(folderName);
+  cacheVariantFolderData(folderName, list);
+  return list;
+}
+
+function getVariantViewItems(){
+  const hasSearch = state.viewMode === 'variant' && state.searchQuery && state.searchQuery.length >= 1;
+  if (hasSearch) {
+    return Array.isArray(state.variantSearchResults) ? state.variantSearchResults : [];
+  }
+  return Array.isArray(state.variants) ? state.variants : [];
+}
+
+async function performVariantSearch(query, skipSpinner){
+  const originalQuery = (query || '').trim();
+  const normalized = originalQuery.toLowerCase();
+  if (!normalized) {
+    state.variantSearchResults = [];
+    state.variantSearchSeq += 1;
+    renderVariants(state.variants);
+    return;
+  }
+  state.variantSubfolderFilter = null;
+  const strip = document.getElementById('gallery-grid');
+  const descEl = document.getElementById('gallery-description');
+  if (!skipSpinner && strip) {
+    strip.innerHTML = `<div class="empty-state subtle">"${originalQuery}" aranıyor, klasörler taranıyor...</div>`;
+  }
+  if (descEl) {
+    descEl.textContent = originalQuery
+      ? `Arama · "${originalQuery}" taranıyor...`
+      : 'Arama · klasörler taranıyor...';
+  }
+  const seq = ++state.variantSearchSeq;
+  const matches = [];
+  let folderNames = Array.isArray(state.variantFolders) ? state.variantFolders.filter(Boolean) : [];
+  const activeFolderBtn = document.querySelector('.folder-item.active-folder');
+  const activeFolderName = activeFolderBtn?.dataset?.folder;
+  if (activeFolderName && !folderNames.includes(activeFolderName)) {
+    folderNames = [activeFolderName, ...folderNames];
+  }
+  const searchLimit = 400;
+  if (!folderNames.length) {
+    const fallback = (Array.isArray(state.variants) ? state.variants : []).filter(item => matchesSearchQuery(item, normalized));
+    state.variantSearchResults = fallback;
+    renderVariants(fallback);
+    return;
+  }
+  for (const folderName of folderNames) {
+    if (seq !== state.variantSearchSeq) return;
+    const list = await getVariantsFromCacheOrFetch(folderName);
+    if (seq !== state.variantSearchSeq) return;
+    if (!Array.isArray(list) || !list.length) continue;
+    const filtered = list.filter(item => matchesSearchQuery(item, normalized));
+    if (filtered.length) {
+      matches.push(...filtered);
+    }
+    if (matches.length >= searchLimit) break;
+  }
+  if (seq !== state.variantSearchSeq) return;
+  state.variantSearchResults = matches;
+  renderVariants(matches);
+}
+
 function renderVariants(items) {
   // Varyantları çoklu önizleme galerisinde göster
   const strip = document.getElementById('gallery-grid');
@@ -1725,19 +1856,33 @@ function renderVariants(items) {
   }
   
   // Apply subfolder filter
-  let data = Array.isArray(items) ? items : [];
+  let data = Array.isArray(items) ? [...items] : [];
   if (state.variantSubfolderFilter) {
     data = data.filter(x => (x.folder || '').toLowerCase() === state.variantSubfolderFilter.toLowerCase());
   }
-  
+  const hasSearch = state.searchQuery && state.searchQuery.length >= 1;
+  const queryLower = hasSearch ? state.searchQuery.toLowerCase() : '';
+  if (hasSearch) {
+    data = data.filter(item => matchesSearchQuery(item, queryLower));
+  }
+
   strip.innerHTML = '';
-  if (descEl) descEl.textContent = data?.length ? `Varyantlar · ${data.length} adet önizleme` : 'Varyantlar';
+  if (descEl) {
+    if (hasSearch) {
+      descEl.textContent = data?.length ? `Arama · ${data.length} varyant` : 'Arama · sonuç bulunamadı';
+    } else {
+      descEl.textContent = data?.length ? `Varyantlar · ${data.length} adet önizleme` : 'Varyantlar';
+    }
+  }
   
   // Alt klasörleri ÖNCE render et (veri olsun olmasın)
   renderVariantSubfoldersToGallery(items);
   
   if (!Array.isArray(data) || !data.length) {
-    strip.innerHTML = '<div class="empty-state subtle">Bu desen için varyant bulunamadı.</div>';
+    const msg = hasSearch && state.searchQuery
+      ? `"${state.searchQuery}" için varyant bulunamadı.`
+      : 'Bu desen için varyant bulunamadı.';
+    strip.innerHTML = `<div class="empty-state subtle">${msg}</div>`;
     return;
   }
   
@@ -1860,7 +2005,7 @@ function renderVariantSubfoldersToGallery(items){
   clearBtn.type = 'button';
   clearBtn.className = 'pill';
   clearBtn.textContent = 'Tümü';
-  clearBtn.addEventListener('click', () => { state.variantSubfolderFilter = null; renderVariants(state.variants); highlightActiveVariantSubfolderGallery(); });
+  clearBtn.addEventListener('click', () => { state.variantSubfolderFilter = null; renderVariants(source); highlightActiveVariantSubfolderGallery(); });
   host.appendChild(clearBtn);
   names.forEach(n => {
     const b = document.createElement('button');
@@ -1868,7 +2013,7 @@ function renderVariantSubfoldersToGallery(items){
     b.className = 'pill';
     b.textContent = n;
     b.dataset.name = n;
-    b.addEventListener('click', () => { state.variantSubfolderFilter = n; renderVariants(state.variants); highlightActiveVariantSubfolderGallery(); });
+    b.addEventListener('click', () => { state.variantSubfolderFilter = n; renderVariants(source); highlightActiveVariantSubfolderGallery(); });
     host.appendChild(b);
   });
   highlightActiveVariantSubfolderGallery();
@@ -1899,6 +2044,41 @@ function renderVariantLeftSubfolders(){
   // Bu fonksiyon artık devre dışı - sol panelde varyant klasörleri gösterme
   console.log('ℹ️ renderVariantLeftSubfolders devre dışı bırakıldı');
   return;
+}
+
+function matchesSearchQuery(item, queryLower){
+  if (!queryLower) return true;
+  const buckets = [item?.fileName, item?.folder, item?.numara, item?.etiketler];
+  const bucketHit = buckets.some(text => typeof text === 'string' && text.toLowerCase().includes(queryLower));
+  if (bucketHit) {
+    return true;
+  }
+  const tagList = state.tagLookup?.[item?.token];
+  if (Array.isArray(tagList)) {
+    return tagList.some(tag => typeof tag === 'string' && tag.toLowerCase().includes(queryLower));
+  }
+  return false;
+}
+
+function collectTagSearchMatches(queryLower){
+  const matches = [];
+  if (!queryLower || !state.taggedDesigns || typeof state.taggedDesigns !== 'object') {
+    return matches;
+  }
+  Object.entries(state.taggedDesigns).forEach(([tagName, designs]) => {
+    if (!Array.isArray(designs) || !designs.length) return;
+    const tagMatches = typeof tagName === 'string' && tagName.toLowerCase().includes(queryLower);
+    designs.forEach(design => {
+      if (!design || !design.token) return;
+      const fileName = typeof design.fileName === 'string' ? design.fileName.toLowerCase() : '';
+      const folder = typeof design.folder === 'string' ? design.folder.toLowerCase() : '';
+      const numara = typeof design.numara === 'string' ? design.numara.toLowerCase() : '';
+      if (tagMatches || fileName.includes(queryLower) || folder.includes(queryLower) || numara.includes(queryLower)) {
+        matches.push({ ...design });
+      }
+    });
+  });
+  return matches;
 }
 
 // Tam ekran işlevleri
@@ -1956,26 +2136,34 @@ elements.fullscreenOverlay?.addEventListener('click', e => { if (e.target === el
 function renderGallery() {
   if (!elements.galleryGrid) return;
   elements.galleryGrid.innerHTML = '';
-  let items = Array.isArray(state.gallery) ? state.gallery : [];
+  let items = Array.isArray(state.gallery) ? [...state.gallery] : [];
   
   // Alt klasör filtresi
   if (state.subfolderFilter) {
     items = items.filter(x => (x.folder || '').toLowerCase() === state.subfolderFilter.toLowerCase());
   }
-  
-  // Arama filtresi
-  if (state.searchQuery && state.searchQuery.length >= 2) {
-    items = items.filter(item => {
-      const fileName = (item.fileName || '').toLowerCase();
-      const folder = (item.folder || '').toLowerCase();
-      const numara = (item.numara || '').toLowerCase();
-      const etiketler = (item.etiketler || '').toLowerCase();
-      
-      return fileName.includes(state.searchQuery) || 
-             folder.includes(state.searchQuery) || 
-             numara.includes(state.searchQuery) || 
-             etiketler.includes(state.searchQuery);
-    });
+
+  const hasSearch = state.searchQuery && state.searchQuery.length >= 1;
+  const queryLower = hasSearch ? state.searchQuery.toLowerCase() : '';
+
+  if (hasSearch) {
+    const baseMatches = items.filter(item => matchesSearchQuery(item, queryLower));
+    const tagMatches = collectTagSearchMatches(queryLower);
+    const merged = new Map();
+    const addItem = entry => {
+      if (!entry) return;
+      const key = entry.token || `${entry.fileName || 'file'}-${entry.folder || 'folder'}-${entry.numara || ''}`;
+      if (!merged.has(key)) {
+        merged.set(key, entry);
+      }
+    };
+    baseMatches.forEach(addItem);
+    tagMatches.forEach(addItem);
+    items = Array.from(merged.values());
+    if (elements.galleryDescription) {
+      const label = items.length ? `${items.length} sonuç` : 'Sonuç bulunamadı';
+      elements.galleryDescription.textContent = `Arama · ${label}`;
+    }
   }
   
   if (!items.length) {
@@ -2095,6 +2283,27 @@ function highlightActiveSubfolder(){
   });
 }
 
+function rebuildTagLookup(){
+  const lookup = {};
+  if (!state.taggedDesigns || typeof state.taggedDesigns !== 'object') {
+    state.tagLookup = lookup;
+    return;
+  }
+  Object.entries(state.taggedDesigns).forEach(([tagName, designs]) => {
+    if (!Array.isArray(designs)) return;
+    designs.forEach(design => {
+      if (!design || !design.token) return;
+      if (!lookup[design.token]) {
+        lookup[design.token] = [];
+      }
+      if (!lookup[design.token].includes(tagName)) {
+        lookup[design.token].push(tagName);
+      }
+    });
+  });
+  state.tagLookup = lookup;
+}
+
 // Etiket ekleme işlevi
 function renderTags() {
   if (!elements.tagCombobox) return;
@@ -2153,7 +2362,7 @@ async function addSelectedDesignsToTag(tag) {
   // Aktif tab'ı yeniden render et
   const isVariantsTab = elements.btnVaryantlar?.classList.contains('active');
   if (isVariantsTab) {
-    renderVariants(state.variants);
+    renderVariants(getVariantViewItems());
   } else {
     renderGallery();
   }
@@ -2171,6 +2380,7 @@ function showTaggedDesigns(tag) {
   
   // Aktif etiketi kaydet
   state.activeTag = tag;
+  state.viewMode = 'design';
   
   // Gallery'yi etiketli desenlerle doldur
   state.gallery = taggedItems;
@@ -2208,6 +2418,7 @@ async function addTag() {
   state.tags.push(formatted);
   await persistTags();
   elements.tagInput.value='';
+  rebuildTagLookup();
   renderTags();
 }
 
@@ -2259,10 +2470,11 @@ elements.tagDeleteBtn?.addEventListener('click', async () => {
 renderTags();
 
 // Tag persistence - Sunucuya kaydet
-// IIS Proxy üzerinden erişim (TagsController)
+// IIS Proxy üzerinden erişim (güvenli, port 8001 kapalı kalabilir)
 const TAGS_API_URL = '/api/tags';
 
 async function persistTags(){
+  rebuildTagLookup();
   try {
     // Sunucuya kaydet
     const response = await fetch(`${TAGS_API_URL}/save`, {
@@ -2280,6 +2492,14 @@ async function persistTags(){
   } catch (error) {
     console.error('Etiket kaydetme hatası:', error);
   }
+  
+  // Backup: localStorage'a da kaydet
+  try {
+    localStorage.setItem('tasarim.tags', JSON.stringify(state.tags));
+    localStorage.setItem('tasarim.taggedDesigns', JSON.stringify(state.taggedDesigns));
+  } catch (e) {
+    console.warn('localStorage\'a backup yapılamadı:', e);
+  }
 }
 
 async function loadTags(){
@@ -2294,9 +2514,31 @@ async function loadTags(){
       if (data.taggedDesigns && typeof data.taggedDesigns === 'object') {
         state.taggedDesigns = data.taggedDesigns;
       }
+    } else {
+      throw new Error('Sunucu hatası: ' + response.status);
     }
   } catch (error) {
-    console.error('Etiketler yüklenemedi:', error);
+    console.warn('Etiketler sunucudan yüklenemedi, localStorage\'den yükleniyor:', error);
+    // Fallback: localStorage'dan yükle
+    try {
+      const raw = localStorage.getItem('tasarim.tags');
+      if (raw){
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) { 
+          state.tags = arr.filter(x => typeof x === 'string').slice(0,200); 
+        }
+      }
+      
+      const rawTaggedDesigns = localStorage.getItem('tasarim.taggedDesigns');
+      if (rawTaggedDesigns) {
+        const obj = JSON.parse(rawTaggedDesigns);
+        if (obj && typeof obj === 'object') {
+          state.taggedDesigns = obj;
+        }
+      }
+    } catch (e) {
+      console.warn('localStorage\'den de yüklenemedi:', e);
+    }
   }
   renderTags();
 }
@@ -2393,7 +2635,7 @@ function toggleVariantSelection(item) {
   }
   
   // Varyantları yeniden render et (checkbox durumlarını güncelle)
-  renderVariants(state.variants);
+  renderVariants(getVariantViewItems());
   updateSelectionUI();
 }
 
@@ -2404,7 +2646,7 @@ function toggleSelectAll() {
   
   if (isVariantsTab) {
     // Varyantlar tab'ı
-    let items = Array.isArray(state.variants) ? state.variants : [];
+    let items = getVariantViewItems();
     
     if (state.variantSubfolderFilter) {
       items = items.filter(x => (x.folder || '').toLowerCase() === state.variantSubfolderFilter.toLowerCase());
@@ -2437,7 +2679,7 @@ function toggleSelectAll() {
       }));
     }
     
-    renderVariants(state.variants);
+    renderVariants(getVariantViewItems());
   } else {
     // Desenler tab'ı
     let items = Array.isArray(state.gallery) ? state.gallery : [];
@@ -2523,7 +2765,7 @@ function updateSelectionUI() {
     let items, allSelected;
     
     if (isVariantsTab) {
-      items = Array.isArray(state.variants) ? state.variants : [];
+      items = getVariantViewItems();
       
       if (state.variantSubfolderFilter) {
         items = items.filter(x => (x.folder || '').toLowerCase() === state.variantSubfolderFilter.toLowerCase());
