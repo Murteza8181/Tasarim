@@ -68,10 +68,24 @@
     }
     .badge.ok { background: rgba(16,185,129,.15); color: #6ee7b7; border-color: rgba(16,185,129,.35); }
     .badge.warn { background: rgba(234,179,8,.15); color: #fde68a; border-color: rgba(234,179,8,.35); }
-    .grid { display: flex; gap: 0; position: relative; }
+    .grid { display: flex; gap: 0; position: relative; align-items: stretch; }
     .grid > section:first-child { width: 280px; min-width: 200px; max-width: 500px; flex-shrink: 0; }
     .grid > #center-panel { flex: 1; min-width: 400px; margin: 0 20px; }
     .grid > #right-panel { width: 320px; min-width: 250px; max-width: 600px; flex-shrink: 0; }
+    #center-panel { align-self: stretch; }
+    #center-panel > .panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    #center-panel .preview-window {
+      flex: 1;
+      min-height: 500px;
+    }
+    #center-panel .filmstrip-block {
+      margin-top: auto;
+    }
     .resizer { width: 4px; cursor: col-resize; background: transparent; position: relative; flex-shrink: 0; z-index: 10; }
     .resizer:hover, .resizer.resizing { background: rgba(59,130,246,.5); }
     .resizer::before { content: ''; position: absolute; top: 0; bottom: 0; left: -4px; right: -4px; }
@@ -129,7 +143,7 @@
       border: 1px solid rgba(148,163,184,.2);
     }
     button:hover:not(:disabled) { transform: translateY(-2px); }
-    .camera-card, .preview-card, .result-card {
+    .preview-card, .result-card {
       background: var(--panel-strong);
       border-radius: 18px;
       border: 1px solid rgba(148,163,184,.2);
@@ -137,15 +151,6 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
-    }
-    .camera-card input[type="file"] {
-      border: 2px dashed rgba(59,130,246,.4);
-      padding: 28px;
-      border-radius: 14px;
-      text-align: center;
-      cursor: pointer;
-      color: var(--text-muted);
-      background: rgba(30,41,59,.6);
     }
     .preview-window {
       position: relative;
@@ -351,6 +356,27 @@
     }
     .logo-card input { display: none; }
     .logo-card img { max-width: 240px; height: auto; margin: 0 auto; }
+    .choice-dialog {
+      position: fixed;
+      inset: 0;
+      background: rgba(2,6,23,.8);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 15;
+      padding: 20px;
+    }
+    .choice-dialog.open { display: flex; }
+    .choice-card {
+      width: min(360px, 100%);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      text-align: center;
+    }
+    .choice-card p { margin: 0; color: var(--text-muted); font-size: .9rem; }
+    .choice-card .actions { display: flex; flex-direction: column; gap: 10px; }
 
     @@media (max-width: 768px) {
       body { padding: 12px; }
@@ -380,7 +406,6 @@
     }
     @@media (max-width: 520px) {
       body { padding: 8px; }
-      .camera-card input[type="file"] { padding: 18px; }
       .shell { gap: 12px; }
       .panel { padding: 12px; }
       .gallery-grid { gap: 6px; }
@@ -429,6 +454,17 @@
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
         <button type="button" class="ghost" id="logo-reset">Varsayılan logoya dön</button>
         <button type="button" class="primary" id="logo-close-secondary">Kapat</button>
+      </div>
+    </div>
+  </div>
+  <div class="choice-dialog" id="source-choice-modal">
+    <div class="panel choice-card">
+      <h2>Fotoğraf Kaynağı</h2>
+      <p>Benzer desen araması için fotoğraf kaynağını seçin.</p>
+      <div class="actions">
+        <button type="button" class="primary" id="choice-gallery-btn">📁 Galeriden Seç</button>
+        <button type="button" class="ghost" id="choice-camera-btn">📷 Kameradan Çek</button>
+        <button type="button" class="ghost" id="choice-cancel-btn" style="opacity:.7;">İptal</button>
       </div>
     </div>
   </div>
@@ -485,7 +521,7 @@
       <button class="ghost" id="remove-from-tag-btn" style="display:none; width:100%; background:#ef4444; border:none; height:40px; font-size:13px; font-weight:bold; color:#fff; opacity:0.5; cursor:not-allowed;" disabled>🗑️ Etiketten Çıkar</button>
 
       <!-- Alt Butonlar -->
-      <button class="primary" id="share-btn" style="width:100%; background:#25D366; border:none; height:44px; font-size:14px; font-weight:bold; opacity:0.5; cursor:not-allowed;" disabled>📤 WhatsApp'a Gönder</button>
+      <button class="primary" id="share-btn" style="width:100%; background:#25D366; border:none; height:44px; font-size:14px; font-weight:bold; opacity:0.5; cursor:not-allowed;" disabled>📥 Seçimleri İndir</button>
       <button class="primary" id="refresh-btn" style="width:100%; background:#4caf50; border:none; height:44px; font-size:14px; font-weight:bold;">🔄 Yenile</button>
       <button class="ghost" id="exit-btn" style="width:100%; background:#f44336; border:none; height:44px; font-size:14px; font-weight:bold; color:#fff;">❌ Çıkış</button>
     </section>
@@ -493,34 +529,23 @@
     <section id="center-panel" style="display:flex; flex-direction:column; gap:12px; flex:1;">
       <section class="panel" style="padding-bottom:8px;">
         <h2 id="main-title">🖼️ Ana Önizleme</h2>
-        <div class="preview-window" style="height:500px; margin-top:16px; margin-bottom:0;">
+        <div class="preview-window" style="margin-top:16px; margin-bottom:0;">
           <img id="main-preview" alt="Ana önizleme" />
         </div>
         
         <!-- Film Şeridi Önizleme -->
-        <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(148,163,184,.15);">
+        <div class="filmstrip-block" style="padding-top:12px; border-top:1px solid rgba(148,163,184,.15);">
           <div id="subfolders-list" class="pill-list" style="margin-bottom:8px;"></div>
           <div id="gallery-grid" class="gallery-grid"></div>
         </div>
       </section>
 
-      <section class="panel">
-        <div class="camera-card">
-          <label for="file-input">Telefon Kamerası</label>
-          <input id="file-input" type="file" accept="image/*" capture="environment" />
-          <div style="display:flex; gap:8px;">
-            <button class="ghost" type="button" id="capture-btn">Kamerayı Aç</button>
-            <button class="primary" type="button" id="analyze-btn" disabled>Aramayı Başlat</button>
-          </div>
-          <small style="color:var(--text-muted);">Desteklenen formatlar: JPG · PNG · BMP · 20MB sınır</small>
-        </div>
-      </section>
     </section>
     <div class="resizer" id="right-resizer"></div>
     <section class="panel" id="right-panel" style="display:flex; flex-direction:column; gap:16px;">
-      <button class="primary" type="button" id="archive-search-btn" style="width:100%; height:50px; font-size:16px; margin-bottom:10px;">🔍 Arşivden Ara</button>
-      <button class="primary" type="button" id="search-by-image-btn" style="width:100%; height:46px; font-size:15px; margin-bottom:20px;">📷 Resimden Ara</button>
-      <input id="search-file-input" type="file" accept="image/*" capture="environment" style="display:none;" />
+      <button class="primary" type="button" id="similar-search-btn" style="width:100%; min-height:54px; font-size:15px; margin-bottom:20px; white-space:normal; line-height:1.4;">🔍 Benzer Desen Arama</button>
+      <input id="gallery-file-input" type="file" accept="image/*" style="display:none;" />
+      <input id="camera-file-input" type="file" accept="image/*" capture="environment" style="display:none;" />
       
       <h2>🏷️ Etiket Yönetimi</h2>
       <div style="margin-top:16px;">
@@ -631,7 +656,6 @@
 })();
 
 const state = {
-  file: null,
   results: [],
   selected: null,
   gallery: [],
@@ -659,11 +683,6 @@ const elements = {};
 function getElements() {
   if (elements._initialized) return elements;
   Object.assign(elements, {
-    input: document.getElementById('file-input'),
-    analyze: document.getElementById('analyze-btn'),
-    capturePreview: document.getElementById('capture-preview'),
-    captureLabel: document.getElementById('capture-label'),
-    captureMeta: document.getElementById('capture-meta'),
     matchPreview: document.getElementById('match-preview'),
     matchLabel: document.getElementById('match-label'),
     matchMeta: document.getElementById('match-meta'),
@@ -684,13 +703,17 @@ function getElements() {
     logoModal: document.getElementById('logo-modal'),
     logoClose: document.getElementById('logo-close'),
     logoCloseSecondary: document.getElementById('logo-close-secondary'),
+    sourceChoiceModal: document.getElementById('source-choice-modal'),
+    sourceGalleryBtn: document.getElementById('choice-gallery-btn'),
+    sourceCameraBtn: document.getElementById('choice-camera-btn'),
+    sourceCancelBtn: document.getElementById('choice-cancel-btn'),
     mainPreview: document.getElementById('main-preview'),
     mainTitle: document.getElementById('main-title'),
     btnDesenler: document.getElementById('btn-desenler'),
     btnVaryantlar: document.getElementById('btn-varyantlar'),
-    archiveSearchBtn: document.getElementById('archive-search-btn'),
-    searchBtn: document.getElementById('search-by-image-btn'),
-    searchFile: document.getElementById('search-file-input'),
+    similarSearchBtn: document.getElementById('similar-search-btn'),
+    galleryFileInput: document.getElementById('gallery-file-input'),
+    cameraFileInput: document.getElementById('camera-file-input'),
     searchInput: document.getElementById('search-input'),
     shareBtn: document.getElementById('share-btn'),
     removeFromTagBtn: document.getElementById('remove-from-tag-btn'),
@@ -724,12 +747,66 @@ const bytesToSize = bytes => {
 
 const encodePath = path => btoa(unescape(encodeURIComponent(path)));
 
+function sanitizeFileName(name, fallback = 'desen') {
+  const raw = (name || '').trim();
+  const base = raw ? raw : `${fallback}_${Date.now()}`;
+  const safe = base.replace(/[^a-z0-9_\-.]/gi, '_');
+  return safe || `${fallback}_${Date.now()}`;
+}
+
+function ensureFileExtension(fileName, fallbackExt = 'jpg') {
+  if (/\.[a-z0-9]{2,5}$/i.test(fileName)) {
+    return fileName;
+  }
+  return `${fileName}.${fallbackExt}`;
+}
+
+function buildImageDownloadUrl(item) {
+  if (item?.token) {
+    return `/archive/image?path=${encodeURIComponent(item.token)}&v=${Date.now()}`;
+  }
+  if (item?.folder && item?.fileName) {
+    return `/archive/image/${encodeURIComponent(item.folder)}/${encodeURIComponent(item.fileName)}?v=${Date.now()}`;
+  }
+  return null;
+}
+
+function supportsNativeFileShare(files) {
+  try {
+    return typeof navigator !== 'undefined'
+      && typeof navigator.canShare === 'function'
+      && typeof navigator.share === 'function'
+      && navigator.canShare({ files });
+  } catch (err) {
+    return false;
+  }
+}
+
+function triggerFileDownload(file) {
+  const url = URL.createObjectURL(file);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = file.name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
 function toggleLogoModal(forceOpen) {
   if (!elements.logoModal) return;
   const shouldOpen = typeof forceOpen === 'boolean'
     ? forceOpen
     : !elements.logoModal.classList.contains('open');
   elements.logoModal.classList.toggle('open', shouldOpen);
+}
+
+function toggleSourceChoice(forceOpen) {
+  if (!elements.sourceChoiceModal) return;
+  const shouldOpen = typeof forceOpen === 'boolean'
+    ? forceOpen
+    : !elements.sourceChoiceModal.classList.contains('open');
+  elements.sourceChoiceModal.classList.toggle('open', shouldOpen);
 }
 
 async function pingPython() {
@@ -884,24 +961,6 @@ loadFolderList(); // Klasör listesini yükle ve sayıları göster
 // Varsayılan olarak ilk önizlemeyi getir
 // loadCategoryPreview artık kategori kullanmıyor, doğrudan folder bazlı
 
-elements.input.addEventListener('change', () => {
-  const file = elements.input.files?.[0];
-  state.file = file || null;
-  if (!file) {
-    if (elements.analyze) elements.analyze.disabled = true;
-    elements.capturePreview?.removeAttribute?.('src');
-    if (elements.captureLabel) elements.captureLabel.textContent = 'Hazır';
-    if (elements.captureMeta) elements.captureMeta.textContent = '0 KB';
-    return;
-  }
-  if (elements.analyze) elements.analyze.disabled = false;
-  if (elements.captureLabel) elements.captureLabel.textContent = file.name;
-  if (elements.captureMeta) elements.captureMeta.textContent = `${bytesToSize(file.size)} · ${file.type || 'Bilinmiyor'}`;
-  const url = URL.createObjectURL(file);
-  if (elements.capturePreview) elements.capturePreview.src = url;
-});
-
-document.getElementById('capture-btn').addEventListener('click', () => elements.input.click());
 elements.refreshArchive?.addEventListener('click', () => renderArchivePreview());
 elements.refreshGallerySecondary?.addEventListener('click', () => loadArchiveSamples(true));
 elements.logoInput?.addEventListener('change', () => {
@@ -929,6 +988,7 @@ elements.logoModal?.addEventListener('click', evt => {
 });
 document.addEventListener('keydown', evt => {
   if (evt.key === 'Escape') toggleLogoModal(false);
+  if (evt.key === 'Escape') toggleSourceChoice(false);
 });
 
 // Sol panel kategori düğmeleri - artık kullanılmıyor (klasör bazlı sistem)
@@ -1419,18 +1479,14 @@ folderButtons.forEach((btn, index) => {
   });
 });
 
-// Sağ panel: Arşivden Ara butonu
-elements.archiveSearchBtn?.addEventListener('click', () => {
-  alert('🔍 Arşivden Benzerlik Araması\n\n' +
-        '📌 Bu özellik için:\n' +
-        '1. Ana önizlemedeki desene sağ tıklayın\n' +
-        '2. "Resmi farklı kaydet" seçin\n' +
-        '3. "📷 Resimden Ara" butonuna tıklayın\n' +
-        '4. Kaydettiğiniz dosyayı seçin\n\n' +
-        '💡 Böylece bu desenin benzerlerini bulabilirsiniz!');
-});
+function triggerSimilarSearch(source) {
+  const input = source === 'camera' ? elements.cameraFileInput : elements.galleryFileInput;
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
 
-// Resimden Ara (tek buton): dosya seçtir ve yükle
+// Galeri veya kamera ile dosya seçip yükle
 async function searchByFile(file) {
   if (!file) return;
   try {
@@ -1456,39 +1512,35 @@ async function searchByFile(file) {
     }
     renderArchivePreview();
   } catch (err) {
-    alert('Resimden arama başarısız: ' + err);
+    alert('Benzer desen araması başarısız: ' + err);
   }
 }
+if (elements.similarSearchBtn) {
+  elements.similarSearchBtn.addEventListener('click', () => toggleSourceChoice(true));
+}
 
-elements.searchBtn?.addEventListener('click', () => elements.searchFile?.click());
-elements.searchFile?.addEventListener('change', async () => {
-  const f = elements.searchFile?.files?.[0];
-  if (f) await searchByFile(f);
+elements.sourceGalleryBtn?.addEventListener('click', () => {
+  toggleSourceChoice(false);
+  triggerSimilarSearch('gallery');
 });
 
-document.getElementById('analyze-btn').addEventListener('click', async () => {
-  if (!state.file) {
-    alert('Önce telefon kameranızdan fotoğraf çekin.');
-    return;
-  }
-  const fd = new FormData();
-  fd.append('file', state.file);
-  elements.analyze.disabled = true;
-  elements.analyze.textContent = 'Aranıyor…';
-  try {
-    const resp = await fetch('/api/upload', { method: 'POST', body: fd });
-    if (!resp.ok) throw new Error(await resp.text());
-    const json = await resp.json();
-    state.results = json.all_results || [];
-    elements.jsonOutput.textContent = JSON.stringify(json, null, 2);
-    renderResults();
-    if (state.results.length) selectResult(0); else clearMatch();
-  } catch (err) {
-    alert('Arama sırasında hata oluştu:\n' + err);
-  } finally {
-    elements.analyze.disabled = false;
-    elements.analyze.textContent = 'Aramayı Başlat';
-  }
+elements.sourceCameraBtn?.addEventListener('click', () => {
+  toggleSourceChoice(false);
+  triggerSimilarSearch('camera');
+});
+
+elements.sourceCancelBtn?.addEventListener('click', () => toggleSourceChoice(false));
+
+elements.sourceChoiceModal?.addEventListener('click', evt => {
+  if (evt.target === elements.sourceChoiceModal) toggleSourceChoice(false);
+});
+
+[elements.galleryFileInput, elements.cameraFileInput].forEach(input => {
+  input?.addEventListener('change', async () => {
+    const f = input.files?.[0];
+    if (f) await searchByFile(f);
+    input.value = '';
+  });
 });
 
 function clearMatch() {
@@ -2816,57 +2868,65 @@ function updateSelectionUI() {
 
 // Mobil paylaşım (WhatsApp, Mail, vb.)
 async function shareGallery() {
+  const isVariantsTab = elements.btnVaryantlar?.classList.contains('active');
+  const items = isVariantsTab ? state.selectedVariants : state.selectedDesigns;
+  if (items.length === 0) {
+    alert(isVariantsTab 
+      ? 'Lütfen önce indirmek istediğiniz varyantları seçin!'
+      : 'Lütfen önce indirmek istediğiniz desenleri seçin!');
+    return;
+  }
+  const shareBtn = elements.shareBtn;
+  if (shareBtn) {
+    shareBtn.dataset.originalLabel = shareBtn.dataset.originalLabel || shareBtn.textContent || '📥 Seçimleri İndir';
+    shareBtn.disabled = true;
+    shareBtn.textContent = 'Seçimler hazırlanıyor…';
+  }
   try {
-    // Hangi tab aktif kontrol et
-    const isVariantsTab = elements.btnVaryantlar?.classList.contains('active');
-    const items = isVariantsTab ? state.selectedVariants : state.selectedDesigns;
-    
-    if (items.length === 0) {
-      alert(isVariantsTab 
-        ? 'Lütfen önce paylaşmak istediğiniz varyantları seçin!'
-        : 'Lütfen önce paylaşmak istediğiniz desenleri seçin!');
-      return;
-    }
-    
-    // WhatsApp başlık
     const shareTitle = state.searchQuery 
       ? `${isVariantsTab ? 'Varyant' : 'Desen'} Arama: "${state.searchQuery}"`
       : state.subfolderFilter 
         ? `${state.subfolderFilter} ${isVariantsTab ? 'Varyantları' : 'Desenleri'}`
         : isVariantsTab ? 'Varyant Koleksiyonu' : 'Desen Koleksiyonu';
-    
-    let whatsappMessage = `*${shareTitle}*\n\n${items.length} adet ${isVariantsTab ? 'varyant' : 'desen'}:\n\n`;
-    
-    // Her resim için base64 fetche et ve mesaja ekle
+    const shareDetails = `${items.length} adet ${isVariantsTab ? 'varyant' : 'desen'} hazırlandı.`;
+    const files = [];
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      const baseUrl = window.location.origin;
-      const imageUrl = `${baseUrl}/archive/image/${encodeURIComponent(item.folder)}/${encodeURIComponent(item.fileName)}`;
-      
-      try {
-        const response = await fetch(imageUrl);
-        const blob = await response.blob();
-        const reader = new FileReader();
-        
-        reader.onload = function(e) {
-          const base64 = e.target.result.split(',')[1];
-          // Base64 resim linki oluştur (data URL)
-          whatsappMessage += `${i+1}. ${item.fileName}\n[Resim](data:image/jpeg;base64,${base64.substring(0, 100)}...)\n\n`;
-        };
-        reader.readAsDataURL(blob);
-      } catch (e) {
-        console.error(`Resim yüklenemedi: ${item.fileName}`, e);
-        whatsappMessage += `${i+1}. ${item.fileName}\n[Yüklenemedi]\n\n`;
+      const imageUrl = buildImageDownloadUrl(item);
+      if (!imageUrl) {
+        console.warn('Görsel URL oluşturulamadı', item);
+        continue;
       }
+      const response = await fetch(imageUrl, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`${item.fileName || 'Görsel'} indirilemedi (HTTP ${response.status})`);
+      }
+      const blob = await response.blob();
+      const ext = blob.type.includes('png') ? 'png'
+        : blob.type.includes('webp') ? 'webp'
+        : blob.type.includes('bmp') ? 'bmp'
+        : 'jpg';
+      const safeBase = sanitizeFileName(item.fileName || `desen_${i+1}`);
+      const fileName = ensureFileExtension(safeBase, ext);
+      files.push(new File([blob], fileName, { type: blob.type || `image/${ext}` }));
     }
-    
-    // WhatsApp'a aç
-    const whatsappText = encodeURIComponent(whatsappMessage);
-    window.open(`https://wa.me/?text=${whatsappText}`, '_blank');
-    
+    if (!files.length) {
+      alert('Seçili görseller indirilemedi. Lütfen tekrar deneyin.');
+      return;
+    }
+    if (supportsNativeFileShare(files)) {
+      await navigator.share({ files, text: shareDetails, title: shareTitle });
+      return;
+    }
+    files.forEach(triggerFileDownload);
   } catch(err) {
     console.error('Paylaşım hatası:', err);
     alert('Paylaşım yapılamadı: ' + err.message);
+  } finally {
+    if (shareBtn) {
+      shareBtn.textContent = shareBtn.dataset.originalLabel || '📥 Seçimleri İndir';
+    }
+    updateSelectionUI();
   }
 }
 

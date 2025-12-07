@@ -34,3 +34,7 @@ api_startup.log
 # Gerekirse silip tekrar ekleyin
 
 web.config.bak
+
+# Deployment artifacts
+publish/
+YEDEK/

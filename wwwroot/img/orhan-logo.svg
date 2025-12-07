@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 240" role="img" aria-label="Orhan Karakoç Logo">
+  <defs>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde68a" />
+      <stop offset="50%" stop-color="#facc15" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+  <rect width="520" height="240" fill="transparent" />
+  <g fill="url(#gold)" filter="url(#glow)">
+    <path d="M260 70 C260 40 230 30 210 60 C200 30 170 40 170 70 C140 60 130 110 170 130 C150 140 150 170 200 176 L200 200 L190 210" fill="none" stroke="url(#gold)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M260 70 C260 40 290 30 310 60 C320 30 350 40 350 70 C380 60 390 110 350 130 C370 140 370 170 320 176 L320 200 L330 210" fill="none" stroke="url(#gold)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M260 70 L260 200" stroke="url(#gold)" stroke-width="10" stroke-linecap="round" />
+    <path d="M260 200 C250 215 240 220 225 230" stroke="url(#gold)" stroke-width="8" stroke-linecap="round" />
+    <path d="M260 200 C270 215 280 220 295 230" stroke="url(#gold)" stroke-width="8" stroke-linecap="round" />
+    <circle cx="220" cy="70" r="12" fill="url(#gold)" />
+    <circle cx="180" cy="110" r="14" fill="url(#gold)" />
+    <circle cx="340" cy="110" r="12" fill="url(#gold)" />
+    <circle cx="300" cy="70" r="12" fill="url(#gold)" />
+    <circle cx="260" cy="50" r="14" fill="url(#gold)" />
+  </g>
+  <text x="50%" y="150" fill="url(#gold)" text-anchor="middle" font-size="48" font-family="'Cinzel', 'Trajan Pro', serif" font-weight="600">
+    ORHAN KARAKOÇ
+  </text>
+  <text x="50%" y="185" fill="#fcd34d" text-anchor="middle" font-size="20" font-family="'Cinzel', 'Trajan Pro', serif">
+    Tekstil · Tasarım Arşivi
+  </text>
+</svg>
