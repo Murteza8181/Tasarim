@@ -3,7 +3,8 @@
     "Test",
     "Test2",
     "Test5",
-    "Murti"
+    "Murti",
+    "Etni̇k"
   ],
   "taggedDesigns": {
     "Test": [
@@ -43,6 +44,14 @@
         "folder": "Etnik Desen Varyantları",
         "numara": null
       },
+      {
+        "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcVkFSWUFOVCAtIMWeYWJsb251IE9sYW4gRGVzZW5sZXJcRXRuaWsgRGVzZW4gVmFyeWFudGxhcsSxXDIwMjMxLmpwZw==",
+        "fileName": "20231.jpg",
+        "folder": "Etnik Desen Varyantları",
+        "numara": null
+      }
+    ],
+    "Etni̇k": [
       {
         "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcVkFSWUFOVCAtIMWeYWJsb251IE9sYW4gRGVzZW5sZXJcRXRuaWsgRGVzZW4gVmFyeWFudGxhcsSxXDIwMjMxLmpwZw==",
         "fileName": "20231.jpg",

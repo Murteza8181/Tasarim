@@ -99,6 +99,7 @@
     select:disabled { opacity: .6; cursor: not-allowed; }
     .pill-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
     .pill { padding: 4px 12px; border-radius: 999px; font-size: .8rem; background: rgba(156,39,176,.2); color: #e1bee7; border: 1px solid rgba(156,39,176,.5); cursor: pointer; transition: all 0.2s ease; }
+    .pill.search-pill { background: rgba(248,113,113,.2); color: #fecaca; border-color: rgba(248,113,113,.5); }
     .pill:hover { background: rgba(156,39,176,.3); border-color: rgba(156,39,176,.7); }
     button {
       border: none;
@@ -243,6 +244,12 @@
       min-height: 160px;
       cursor: grab;
     }
+    .gallery-grid.search-strip {
+      cursor: pointer;
+    }
+    .gallery-grid.search-strip .gallery-item {
+      min-width: 140px;
+    }
     .gallery-grid:active {
       cursor: grabbing;
     }
@@ -250,6 +257,22 @@
     .gallery-grid::-webkit-scrollbar-track { background: rgba(148,163,184,.1); border-radius: 4px; }
     .gallery-grid::-webkit-scrollbar-thumb { background: rgba(59,130,246,.4); border-radius: 4px; }
     .gallery-grid::-webkit-scrollbar-thumb:hover { background: rgba(59,130,246,.6); }
+    .gallery-grid .score-chip {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: .75rem;
+      background: rgba(2,6,23,.75);
+      color: #93c5fd;
+      border: 1px solid rgba(148,163,184,.35);
+    }
+    .gallery-grid.search-strip .score-chip {
+      background: rgba(248,113,113,.9);
+      color: #fff;
+      border-color: rgba(248,113,113,.4);
+    }
     
     /* Checkbox stilleri */
     .design-checkbox {
@@ -646,7 +669,9 @@ const state = {
   _variantsLoading: false,
   searchQuery: '', // Arama query'si
   selectedDesigns: [], // Seçili desenler: {token, fileName, folder, numara}
-  selectedVariants: [] // Seçili varyantlar
+  selectedVariants: [], // Seçili varyantlar
+  searchFilmstrip: [],
+  searchContext: null
 };
 // Element referanslarını lazy olarak al (DOM hazır olduğunda)
 const elements = {};
@@ -1041,6 +1066,7 @@ async function fetchVariantCount(folderName, btnElement){
 }
 
 async function loadVariantFolder(folderName){
+  clearSearchFilmstrip(true);
   state.variantSubfolderFilter = null;
   
   // localStorage'a son açılan klasörü kaydet
@@ -1388,21 +1414,13 @@ async function searchByFile(file) {
     if (!resp.ok) throw new Error(await resp.text());
     const json = await resp.json();
     const results = Array.isArray(json) ? json : (json.all_results || json.results || []);
-    state.results = results;
-    if (results.length) {
-      const best = results[0];
-      if (best.path) {
-        const token = encodePath(best.path);
-        if (elements.mainPreview) {
-          elements.mainPreview.src = `/archive/image?path=${encodeURIComponent(token)}&v=${Date.now()}`;
-        }
-        if (elements.mainTitle) {
-          const fn = best.path.split('\\').pop() || 'Eşleşme';
-          elements.mainTitle.textContent = `🖼️ Eşleşme · ${fn}`;
-        }
-      }
+    state.results = Array.isArray(results) ? results : [];
+    renderResults('Resimden arama');
+    if (state.results.length) {
+      selectResult(0);
+    } else {
+      clearMatch();
     }
-    renderArchivePreview();
   } catch (err) {
     alert('Resimden arama başarısız: ' + err);
   }
@@ -1427,9 +1445,10 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
     const resp = await fetch('/api/upload', { method: 'POST', body: fd });
     if (!resp.ok) throw new Error(await resp.text());
     const json = await resp.json();
-    state.results = json.all_results || [];
+    const results = Array.isArray(json) ? json : (json.all_results || json.results || []);
+    state.results = Array.isArray(results) ? results : [];
     elements.jsonOutput.textContent = JSON.stringify(json, null, 2);
-    renderResults();
+    renderResults('Kameradan arama');
     if (state.results.length) selectResult(0); else clearMatch();
   } catch (err) {
     alert('Arama sırasında hata oluştu:\n' + err);
@@ -1444,10 +1463,16 @@ function clearMatch() {
   if (elements.matchMeta) elements.matchMeta.textContent = '';
   if (elements.matchScore) elements.matchScore.textContent = '0%';
   elements.matchPreview?.removeAttribute?.('src');
+  clearSearchFilmstrip();
   renderArchivePreview();
 }
 
-function renderResults() {
+function renderResults(contextLabel) {
+  if (typeof contextLabel === 'string') {
+    applySearchFilmstrip(state.results, contextLabel);
+  } else if (state.searchFilmstrip?.length) {
+    renderGallery();
+  }
   if (!elements.resultList) {
     // Sonuç listesi DOM'da yoksa sadece küçük önizlemeyi güncelle
     renderArchivePreview();
@@ -1480,16 +1505,22 @@ function selectResult(index) {
   renderResults();
   const result = state.results[index];
   if (!result) return;
-  if (elements.matchLabel) elements.matchLabel.textContent = result.path?.split('\\').pop() || 'Desen';
+  const displayName = result.fileName || result.path?.split('\\').pop() || 'Desen';
+  if (elements.matchLabel) elements.matchLabel.textContent = displayName;
   if (elements.matchMeta) elements.matchMeta.textContent = result.path || '';
   if (elements.matchScore) elements.matchScore.textContent = `${Math.round((result.score || 0)*100)}%`;
-  if (result.path) {
-    try {
-      const token = encodePath(result.path);
-      if (elements.matchPreview) elements.matchPreview.src = `/archive/image?path=${encodeURIComponent(token)}&v=${Date.now()}`;
-    } catch {
-      elements.matchPreview?.removeAttribute?.('src');
+  const token = result.token || (result.path ? encodePath(result.path) : null);
+  if (token) {
+    setMainPreviewFromItem({
+      token,
+      fileName: displayName,
+      folder: result.folder || ''
+    });
+    if (elements.matchPreview) {
+      elements.matchPreview.src = `/archive/image?path=${encodeURIComponent(token)}&v=${Date.now()}`;
     }
+  } else {
+    elements.matchPreview?.removeAttribute?.('src');
   }
 }
 
@@ -1518,6 +1549,7 @@ function initLogoFromStorage() {
 
 async function loadArchiveSamples(showSpinner = false) {
   if (!elements.galleryGrid) return;
+  clearSearchFilmstrip(true);
   if (showSpinner) {
     elements.galleryGrid.innerHTML = '<div class="empty-state subtle">Arşiv yeniden taranıyor...</div>';
   }
@@ -1566,6 +1598,7 @@ async function loadCategoryPreview(category) {
 
 async function loadCategoryGallery(category) {
   try {
+    clearSearchFilmstrip(true);
     // Etiket görünümünden çıkıyoruz
     state.activeTag = null;
     if (elements.removeFromTagBtn) {
@@ -1658,6 +1691,10 @@ function setMainPreviewFromItem(item) {
 
 // Varyantlar
 async function loadVariants() {
+  if (state.searchFilmstrip?.length) {
+    console.log('🔴 Benzer arama film şeridi aktif, varyant yükleme atlandı.');
+    return;
+  }
   const strip = document.getElementById('variants-strip');
   const countEl = document.getElementById('variants-count');
   
@@ -1715,6 +1752,10 @@ async function fetchVariantsByFolder(folderName){
 }
 
 function renderVariants(items) {
+  if (state.searchFilmstrip?.length) {
+    console.log('🔴 Benzer arama film şeridi aktif, varyantlar gösterilmiyor.');
+    return;
+  }
   // Varyantları çoklu önizleme galerisinde göster
   const strip = document.getElementById('gallery-grid');
   const descEl = document.getElementById('gallery-description');
@@ -1815,6 +1856,7 @@ function renderVariants(items) {
 }
 
 function autoLoadVariants(){
+  if (state.searchFilmstrip?.length) return;
   const strip = document.getElementById('variants-strip');
   if (!state.mainToken || !strip) return;
   if (strip.children.length === 0) {
@@ -1932,19 +1974,20 @@ document.addEventListener('keydown', e => {
   }
 });
 function navigateFullscreen(dir){
-  console.log('Navigate:', dir, 'Gallery length:', state.gallery?.length, 'Main token:', state.mainToken);
-  if (!Array.isArray(state.gallery) || !state.gallery.length) {
+  const source = (state.searchFilmstrip?.length ? state.searchFilmstrip : state.gallery) || [];
+  console.log('Navigate:', dir, 'Gallery length:', source.length, 'Main token:', state.mainToken);
+  if (!Array.isArray(source) || !source.length) {
     console.warn('Galeri boş veya yüklenmemiş');
     return;
   }
-  const idxCurrent = state.gallery.findIndex(x => x.token === state.mainToken);
+  const idxCurrent = source.findIndex(x => x.token === state.mainToken);
   console.log('Current index:', idxCurrent);
   if (idxCurrent === -1) {
     console.warn('Mevcut resim galeride bulunamadı');
     return;
   }
-  let next = (idxCurrent + dir + state.gallery.length) % state.gallery.length;
-  const item = state.gallery[next];
+  let next = (idxCurrent + dir + source.length) % source.length;
+  const item = source[next];
   console.log('Next item:', item);
   setMainPreviewFromItem(item);
   if (elements.fullscreenOverlay?.classList.contains('open') && elements.fullscreenImg) {
@@ -1953,74 +1996,116 @@ function navigateFullscreen(dir){
 }
 elements.fullscreenOverlay?.addEventListener('click', e => { if (e.target === elements.fullscreenOverlay) closeFullscreen(); });
 
+function clearSearchFilmstrip(silent = false) {
+  const hadStrip = Array.isArray(state.searchFilmstrip) && state.searchFilmstrip.length > 0;
+  state.searchFilmstrip = [];
+  state.searchContext = null;
+  state.selected = null;
+  if (hadStrip && !silent) {
+    renderGallery();
+    renderSubfoldersFromGallery();
+  }
+}
+
+function applySearchFilmstrip(results, contextLabel) {
+  if (!Array.isArray(results) || !results.length) {
+    clearSearchFilmstrip();
+    return;
+  }
+  state.searchFilmstrip = results
+    .filter(item => item && (item.token || item.path))
+    .map((result, index) => ({
+      token: result.token || (result.path ? encodePath(result.path) : null),
+      fileName: result.fileName || result.path?.split('\\').pop() || `Sonuç ${index + 1}`,
+      folder: result.folder || '',
+      score: typeof result.score === 'number' ? result.score : null,
+      path: result.path || '',
+      resultIndex: index
+    }))
+    .filter(item => !!item.token);
+  state.searchContext = (typeof contextLabel === 'string' && contextLabel.trim())
+    ? contextLabel.trim()
+    : (state.searchContext || 'Benzer arama');
+  renderGallery();
+  renderSubfoldersFromGallery();
+}
+
 function renderGallery() {
   if (!elements.galleryGrid) return;
-  elements.galleryGrid.innerHTML = '';
-  let items = Array.isArray(state.gallery) ? state.gallery : [];
+  const host = elements.galleryGrid;
+  const usingSearchStrip = Array.isArray(state.searchFilmstrip) && state.searchFilmstrip.length > 0;
+  host.classList.toggle('search-strip', usingSearchStrip);
+  host.innerHTML = '';
+  let items = usingSearchStrip
+    ? [...state.searchFilmstrip]
+    : (Array.isArray(state.gallery) ? [...state.gallery] : []);
   
-  // Alt klasör filtresi
-  if (state.subfolderFilter) {
-    items = items.filter(x => (x.folder || '').toLowerCase() === state.subfolderFilter.toLowerCase());
-  }
-  
-  // Arama filtresi
-  if (state.searchQuery && state.searchQuery.length >= 2) {
-    items = items.filter(item => {
-      const fileName = (item.fileName || '').toLowerCase();
-      const folder = (item.folder || '').toLowerCase();
-      const numara = (item.numara || '').toLowerCase();
-      const etiketler = (item.etiketler || '').toLowerCase();
-      
-      return fileName.includes(state.searchQuery) || 
-             folder.includes(state.searchQuery) || 
-             numara.includes(state.searchQuery) || 
-             etiketler.includes(state.searchQuery);
-    });
+  if (!usingSearchStrip) {
+    if (state.subfolderFilter) {
+      items = items.filter(x => (x.folder || '').toLowerCase() === state.subfolderFilter.toLowerCase());
+    }
+    if (state.searchQuery && state.searchQuery.length >= 2) {
+      items = items.filter(item => {
+        const fileName = (item.fileName || '').toLowerCase();
+        const folder = (item.folder || '').toLowerCase();
+        const numara = (item.numara || '').toLowerCase();
+        const etiketler = (item.etiketler || '').toLowerCase();
+        
+        return fileName.includes(state.searchQuery) || 
+               folder.includes(state.searchQuery) || 
+               numara.includes(state.searchQuery) || 
+               etiketler.includes(state.searchQuery);
+      });
+    }
   }
   
   if (!items.length) {
-    const msg = state.searchQuery ? `"${state.searchQuery}" için sonuç bulunamadı.` : 'Arşivde görüntülenecek desen bulunamadı.';
-    elements.galleryGrid.innerHTML = `<div class="empty-state subtle">${msg}</div>`;
+    const msg = usingSearchStrip
+      ? 'Benzerlik araması için sonuç bulunamadı.'
+      : (state.searchQuery ? `"${state.searchQuery}" için sonuç bulunamadı.` : 'Arşivde görüntülenecek desen bulunamadı.');
+    host.innerHTML = `<div class="empty-state subtle">${msg}</div>`;
     return;
   }
 
   items.forEach(item => {
-    const isSelected = state.selectedDesigns.some(x => x.token === item.token);
-    
+    const isSelected = !usingSearchStrip && state.selectedDesigns.some(x => x.token === item.token);
     const tile = document.createElement('div');
     tile.className = 'gallery-item';
+    if (usingSearchStrip && typeof item.resultIndex === 'number' && state.selected === item.resultIndex) {
+      tile.classList.add('active');
+    }
     tile.style.position = 'relative';
     tile.style.minWidth = '110px';
     tile.style.flexShrink = '0';
     tile.style.cursor = 'pointer';
     tile.dataset.token = item.token;
     
-    // Checkbox
-    const checkboxWrapper = document.createElement('div');
-    checkboxWrapper.style.position = 'absolute';
-    checkboxWrapper.style.top = '4px';
-    checkboxWrapper.style.left = '4px';
-    checkboxWrapper.style.zIndex = '10';
+    if (!usingSearchStrip) {
+      const checkboxWrapper = document.createElement('div');
+      checkboxWrapper.style.position = 'absolute';
+      checkboxWrapper.style.top = '4px';
+      checkboxWrapper.style.left = '4px';
+      checkboxWrapper.style.zIndex = '10';
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'design-checkbox';
+      checkbox.dataset.token = item.token;
+      checkbox.checked = isSelected;
+      checkbox.style.width = '20px';
+      checkbox.style.height = '20px';
+      checkbox.style.cursor = 'pointer';
+      checkbox.style.accentColor = '#007bff';
+      
+      checkbox.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleDesignSelection(item);
+      });
+      
+      checkboxWrapper.appendChild(checkbox);
+      tile.appendChild(checkboxWrapper);
+    }
     
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.className = 'design-checkbox';
-    checkbox.dataset.token = item.token;
-    checkbox.checked = isSelected;
-    checkbox.style.width = '20px';
-    checkbox.style.height = '20px';
-    checkbox.style.cursor = 'pointer';
-    checkbox.style.accentColor = '#007bff';
-    
-    checkbox.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleDesignSelection(item);
-    });
-    
-    checkboxWrapper.appendChild(checkbox);
-    tile.appendChild(checkboxWrapper);
-    
-    // Resim
     if (item.token) {
       const img = document.createElement('img');
       img.loading = 'lazy';
@@ -2030,12 +2115,18 @@ function renderGallery() {
       img.style.height = '100px';
       img.style.objectFit = 'cover';
       img.style.borderRadius = '4px';
-      img.style.border = isSelected ? '2px solid #007bff' : '1px solid #ddd';
-      img.style.boxShadow = isSelected ? '0 0 0 2px #007bff' : 'none';
+      img.style.border = !usingSearchStrip && isSelected ? '2px solid #007bff' : '1px solid #ddd';
+      img.style.boxShadow = !usingSearchStrip && isSelected ? '0 0 0 2px #007bff' : 'none';
       tile.appendChild(img);
     }
+
+    if (usingSearchStrip && typeof item.score === 'number') {
+      const badge = document.createElement('span');
+      badge.className = 'score-chip';
+      badge.textContent = `${Math.round((item.score || 0) * 100)}%`;
+      tile.appendChild(badge);
+    }
     
-    // Dosya adı
     const label = document.createElement('div');
     label.style.marginTop = '4px';
     label.style.fontSize = '11px';
@@ -2044,19 +2135,26 @@ function renderGallery() {
     label.style.whiteSpace = 'nowrap';
     label.style.overflow = 'hidden';
     label.style.textOverflow = 'ellipsis';
-    label.textContent = item.fileName || 'Desen';
+    label.textContent = usingSearchStrip && typeof item.score === 'number'
+      ? `${item.fileName || 'Desen'} · ${Math.round((item.score || 0) * 100)}%`
+      : (item.fileName || 'Desen');
     tile.appendChild(label);
     
-    // Ana önizlemeye tıklama
-    tile.addEventListener('click', () => setMainPreviewFromItem(item));
+    tile.addEventListener('click', () => {
+      if (usingSearchStrip && typeof item.resultIndex === 'number') {
+        selectResult(item.resultIndex);
+        return;
+      }
+      setMainPreviewFromItem(item);
+    });
     
-    elements.galleryGrid.appendChild(tile);
+    host.appendChild(tile);
   });
   
-  // Seçim UI'ını güncelle
-  updateSelectionUI();
+  if (!usingSearchStrip) {
+    updateSelectionUI();
+  }
   
-  // Film şeridi için sürükle-kaydır yeniden başlat
   initDragScroll();
 }
 
