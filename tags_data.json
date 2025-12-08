@@ -4,7 +4,8 @@
     "Test2",
     "Test5",
     "Murti",
-    "Etni̇k"
+    "Etni̇k",
+    "Mmm"
   ],
   "taggedDesigns": {
     "Test": [
@@ -28,6 +29,18 @@
         "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcS2FyYWtvw6cgVGFzYXLEsW1sYXJcw4dpemdpIERlc2VubGVyXDE0MzAgcy5qcGc=",
         "fileName": "1430 s.jpg",
         "folder": "Çizgi Desenler",
+        "numara": null
+      },
+      {
+        "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcVkFSWUFOVCAtIMWeYWJsb251IE9sYW4gRGVzZW5sZXJcRXRuaWsgRGVzZW4gVmFyeWFudGxhcsSxXDIwMDEyLmpwZw==",
+        "fileName": "20012.jpg",
+        "folder": "Etnik Desen Varyantları",
+        "numara": null
+      },
+      {
+        "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcVkFSWUFOVCAtIMWeYWJsb251IE9sYW4gRGVzZW5sZXJcRWtvc2UgRGVzZW4gVmFyeWFudGxhcsSxXDIwMDA5LmpwZw==",
+        "fileName": "20009.jpg",
+        "folder": "Ekose Desen Varyantları",
         "numara": null
       }
     ],
@@ -56,6 +69,14 @@
         "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcVkFSWUFOVCAtIMWeYWJsb251IE9sYW4gRGVzZW5sZXJcRXRuaWsgRGVzZW4gVmFyeWFudGxhcsSxXDIwMjMxLmpwZw==",
         "fileName": "20231.jpg",
         "folder": "Etnik Desen Varyantları",
+        "numara": null
+      }
+    ],
+    "Mmm": [
+      {
+        "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcS2FyYWtvw6cgVGFzYXLEsW1sYXJcxZ5hYmxvbnUgT2xhbiBEZXNlbmxlclwyMDI4MyAtIE9yaWppbmFsLmpwZw==",
+        "fileName": "20283 - Orijinal.jpg",
+        "folder": "Şablonu Olan Desenler",
         "numara": null
       }
     ]

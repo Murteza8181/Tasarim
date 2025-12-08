@@ -565,6 +565,12 @@
       <button class="primary" type="button" id="similar-search-btn" style="width:100%; min-height:54px; font-size:15px; margin-bottom:20px; white-space:normal; line-height:1.4;">🔍 Benzer Desen Arama</button>
       <input id="gallery-file-input" type="file" accept="image/*" style="display:none;" />
       <input id="camera-file-input" type="file" accept="image/*" capture="environment" style="display:none;" />
+
+      <div class="capture-preview-card" aria-label="Arama görseli" style="padding:0; border-radius:18px; background:rgba(8,15,32,0.65); border:1px solid rgba(59,130,246,0.2); overflow:hidden;">
+        <div id="capture-frame" style="width:100%; aspect-ratio:1 / 1; border-radius:18px; background:repeating-linear-gradient(45deg, rgba(148,163,184,0.18) 0 12px, rgba(8,15,32,0.8) 12px 24px); border:1px dashed rgba(148,163,184,0.35); display:flex; align-items:center; justify-content:center; overflow:hidden; transition:background .3s ease, border .3s ease;">
+          <img id="capture-preview" alt="Arama için seçilen görsel" style="width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .25s ease; display:block;" />
+        </div>
+      </div>
       
       <h2>🏷️ Etiket Yönetimi</h2>
       <div style="margin-top:16px;">
@@ -728,6 +734,8 @@ function getElements() {
     sourceGalleryBtn: document.getElementById('choice-gallery-btn'),
     sourceCameraBtn: document.getElementById('choice-camera-btn'),
     sourceCancelBtn: document.getElementById('choice-cancel-btn'),
+    captureFrame: document.getElementById('capture-frame'),
+    capturePreview: document.getElementById('capture-preview'),
     mainPreview: document.getElementById('main-preview'),
     mainTitle: document.getElementById('main-title'),
     btnDesenler: document.getElementById('btn-desenler'),
@@ -767,6 +775,14 @@ const bytesToSize = bytes => {
 };
 
 const encodePath = path => btoa(unescape(encodeURIComponent(path)));
+
+const captureFrameStyles = {
+  emptyBg: 'repeating-linear-gradient(45deg, rgba(148,163,184,0.18) 0 12px, rgba(8,15,32,0.8) 12px 24px)',
+  filledBg: 'rgba(2,6,23,0.35)',
+  emptyBorder: '1px dashed rgba(148,163,184,0.35)',
+  filledBorder: '1px solid rgba(59,130,246,0.35)'
+};
+let capturePreviewObjectUrl = null;
 
 function sanitizeFileName(name, fallback = 'desen') {
   const raw = (name || '').trim();
@@ -1508,6 +1524,30 @@ function triggerSimilarSearch(source) {
   input.click();
 }
 
+function updateCapturePreview(file) {
+  const preview = elements.capturePreview;
+  const frame = elements.captureFrame;
+  if (!preview || !frame) return;
+  if (capturePreviewObjectUrl) {
+    URL.revokeObjectURL(capturePreviewObjectUrl);
+    capturePreviewObjectUrl = null;
+  }
+  if (!file) {
+    preview.removeAttribute('src');
+    preview.style.opacity = '0';
+    frame.style.background = captureFrameStyles.emptyBg;
+    frame.style.border = captureFrameStyles.emptyBorder;
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  capturePreviewObjectUrl = url;
+  preview.src = url;
+  preview.style.opacity = '1';
+  frame.style.background = captureFrameStyles.filledBg;
+  frame.style.border = captureFrameStyles.filledBorder;
+}
+updateCapturePreview(null);
+
 // Galeri veya kamera ile dosya seçip yükle
 async function searchByFile(file) {
   if (!file) return;
@@ -1552,7 +1592,12 @@ elements.sourceChoiceModal?.addEventListener('click', evt => {
 [elements.galleryFileInput, elements.cameraFileInput].forEach(input => {
   input?.addEventListener('change', async () => {
     const f = input.files?.[0];
-    if (f) await searchByFile(f);
+    if (f) {
+      updateCapturePreview(f);
+      await searchByFile(f);
+    } else {
+      updateCapturePreview(null);
+    }
     input.value = '';
   });
 });
@@ -1748,10 +1793,13 @@ async function loadFolderGallery(folder) {
     if (elements.galleryDescription) elements.galleryDescription.textContent = `${folder} · ${state.gallery.length} adet önizleme`;
     // Alt klasörler listesi
     renderSubfoldersFromGallery();
-    if (!state.mainToken && state.gallery.length) {
-      setMainPreviewFromItem(state.gallery[0]);
-      autoLoadVariants();
+    if (state.gallery.length) {
+      const nextPrimary = state.gallery[0];
+      if (!state.mainToken || nextPrimary?.token !== state.mainToken) {
+        setMainPreviewFromItem(nextPrimary);
+      }
     }
+    autoLoadVariants();
   } catch (err) {
     if (elements.galleryDescription) elements.galleryDescription.textContent = 'Klasör galerisi yüklenemedi';
   }
@@ -2526,6 +2574,7 @@ function showTaggedDesigns(tag) {
   if (taggedItems.length === 0) {
     return;
   }
+  clearSearchFilmstrip(true);
   
   // Aktif etiketi kaydet
   state.activeTag = tag;
@@ -2553,6 +2602,10 @@ function showTaggedDesigns(tag) {
   }
   
   renderGallery();
+  if (taggedItems.length) {
+    setMainPreviewFromItem(taggedItems[0]);
+    autoLoadVariants();
+  }
   updateStatistics();
 }
 
