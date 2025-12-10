@@ -1,23 +1,10 @@
-@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
-@{
-  Layout = null;
-  // Tarayıcı file:/// yollarını engeller; uygulama içi statik kaynağı kullan.
-  var logoPath = Url.Content("~/img/orhan-logo.png");
-  var variantRoot = Configuration["VaryantKlasoru"] ?? string.Empty;
-  string[] globalVariantFolders = System.Array.Empty<string>();
-  try {
-    if (!string.IsNullOrWhiteSpace(variantRoot) && System.IO.Directory.Exists(variantRoot)) {
-      globalVariantFolders = System.IO.Directory.GetDirectories(variantRoot);
-    }
-  } catch { globalVariantFolders = System.Array.Empty<string>(); }
-}
 <!doctype html>
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Orhan Karakoç Tekstil · Desen Arama</title>
-  <link rel="icon" href="~/img/orhan-logo.png" type="image/png" />
+  <link rel="icon" href="/img/orhan-logo.png" type="image/png" />
   <style>
     :root {
       color-scheme: light dark;
@@ -68,24 +55,10 @@
     }
     .badge.ok { background: rgba(16,185,129,.15); color: #6ee7b7; border-color: rgba(16,185,129,.35); }
     .badge.warn { background: rgba(234,179,8,.15); color: #fde68a; border-color: rgba(234,179,8,.35); }
-    .grid { display: flex; gap: 0; position: relative; align-items: stretch; }
+    .grid { display: flex; gap: 0; position: relative; }
     .grid > section:first-child { width: 280px; min-width: 200px; max-width: 500px; flex-shrink: 0; }
     .grid > #center-panel { flex: 1; min-width: 400px; margin: 0 20px; }
     .grid > #right-panel { width: 320px; min-width: 250px; max-width: 600px; flex-shrink: 0; }
-    #center-panel { align-self: stretch; }
-    #center-panel > .panel {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
-    #center-panel .preview-window {
-      flex: 1;
-      min-height: 500px;
-    }
-    #center-panel .filmstrip-block {
-      margin-top: auto;
-    }
     .resizer { width: 4px; cursor: col-resize; background: transparent; position: relative; flex-shrink: 0; z-index: 10; }
     .resizer:hover, .resizer.resizing { background: rgba(59,130,246,.5); }
     .resizer::before { content: ''; position: absolute; top: 0; bottom: 0; left: -4px; right: -4px; }
@@ -96,14 +69,6 @@
       padding: 20px;
       border: 1px solid var(--border);
       box-shadow: 0 20px 40px rgba(2,6,23,.45);
-    }
-    #folder-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      padding-right: 6px;
-      max-height: 420px;
-      overflow-y: auto;
     }
     .panel-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
     .panel h2 { margin: 0 0 12px; font-size: 1.05rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
@@ -120,12 +85,6 @@
     }
     select:disabled { opacity: .6; cursor: not-allowed; }
     .pill-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-    #tag-list {
-      display: none;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
     .pill { padding: 4px 12px; border-radius: 999px; font-size: .8rem; background: rgba(156,39,176,.2); color: #e1bee7; border: 1px solid rgba(156,39,176,.5); cursor: pointer; transition: all 0.2s ease; }
     .pill:hover { background: rgba(156,39,176,.3); border-color: rgba(156,39,176,.7); }
     button {
@@ -156,68 +115,8 @@
       color: var(--text-muted);
       border: 1px solid rgba(148,163,184,.2);
     }
-    button.folder-item {
-      width: 100%;
-      border: 1px solid rgba(59,130,246,.45);
-      border-radius: 14px;
-      padding: 13px 16px;
-      background: linear-gradient(135deg, #1f3b63, #112036);
-      color: #fff;
-      font-size: .85rem;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      cursor: pointer;
-      transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
-    }
-    button.folder-item .folder-name {
-      flex: 1;
-      text-align: left;
-      letter-spacing: .02em;
-    }
-    button.folder-item .folder-count {
-      color: #8bffd5;
-      font-weight: 700;
-      font-size: .9rem;
-    }
-    button.folder-item:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 8px 18px rgba(15,23,42,.55);
-      border-color: rgba(99,102,241,.75);
-    }
-    .tag-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      border: 1px solid rgba(236,72,153,.4);
-      border-radius: 999px;
-      padding: 6px 14px;
-      background: rgba(236,72,153,.15);
-      color: #fbcfe8;
-      font-size: .85rem;
-      cursor: pointer;
-      transition: transform .12s ease, border-color .12s ease, background .12s ease;
-    }
-    .tag-pill__label { text-transform: capitalize; letter-spacing: .03em; }
-    .tag-pill__count {
-      min-width: 26px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: rgba(236,72,153,.25);
-      font-weight: 700;
-      text-align: center;
-      color: #fff;
-      font-size: .85rem;
-    }
-    .tag-pill:hover {
-      transform: translateY(-1px);
-      border-color: rgba(236,72,153,.8);
-      background: rgba(236,72,153,.25);
-    }
     button:hover:not(:disabled) { transform: translateY(-2px); }
-    .preview-card, .result-card {
+    .camera-card, .preview-card, .result-card {
       background: var(--panel-strong);
       border-radius: 18px;
       border: 1px solid rgba(148,163,184,.2);
@@ -225,6 +124,15 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
+    }
+    .camera-card input[type="file"] {
+      border: 2px dashed rgba(59,130,246,.4);
+      padding: 28px;
+      border-radius: 14px;
+      text-align: center;
+      cursor: pointer;
+      color: var(--text-muted);
+      background: rgba(30,41,59,.6);
     }
     .preview-window {
       position: relative;
@@ -398,7 +306,7 @@
     .gallery-item .label strong { font-size: .85rem; }
     .gallery-item .label span { font-size: .7rem; color: var(--text-muted); }
     .gallery-item:hover { border-color: rgba(59,130,246,.5); box-shadow: 0 10px 25px rgba(15,23,42,.5); }
-    @@media (max-width: 1200px) {
+    @media (max-width: 1200px) {
       .grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
     }
     .logo-dialog {
@@ -430,29 +338,8 @@
     }
     .logo-card input { display: none; }
     .logo-card img { max-width: 240px; height: auto; margin: 0 auto; }
-    .choice-dialog {
-      position: fixed;
-      inset: 0;
-      background: rgba(2,6,23,.8);
-      backdrop-filter: blur(4px);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 15;
-      padding: 20px;
-    }
-    .choice-dialog.open { display: flex; }
-    .choice-card {
-      width: min(360px, 100%);
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      text-align: center;
-    }
-    .choice-card p { margin: 0; color: var(--text-muted); font-size: .9rem; }
-    .choice-card .actions { display: flex; flex-direction: column; gap: 10px; }
 
-    @@media (max-width: 768px) {
+    @media (max-width: 768px) {
       body { padding: 12px; }
       .shell { gap: 16px; }
       .panel { padding: 14px; }
@@ -478,8 +365,9 @@
       .gallery-grid { gap: 8px; }
       .gallery-item { min-width: 90px; max-width: 90px; height: 115px; }
     }
-    @@media (max-width: 520px) {
+    @media (max-width: 520px) {
       body { padding: 8px; }
+      .camera-card input[type="file"] { padding: 18px; }
       .shell { gap: 12px; }
       .panel { padding: 12px; }
       .gallery-grid { gap: 6px; }
@@ -490,25 +378,11 @@
     }
     /* Aktif durum stilleri */
     .active-category { outline: 2px solid #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.15); }
-    .folder-item.active-folder {
-      border-color: rgba(34,197,94,.95) !important;
-      box-shadow: 0 0 0 2px rgba(34,197,94,.35);
-      background: linear-gradient(135deg, #114f2c, #0b2916);
-    }
+    .folder-item.active-folder { background:#0d47a1 !important; box-shadow: 0 0 0 2px rgba(255,255,255,.25); }
   </style>
   <script>
     // Sunucu tarafında bulunan varyant klasörleri (mevcut dizinlerden alınır)
-    @{
-      var names = new List<string>();
-      foreach (var dir in globalVariantFolders) {
-        try {
-          var name = System.IO.Path.GetFileName(dir);
-          if (!string.IsNullOrWhiteSpace(name)) names.Add(name);
-        } catch { }
-      }
-      var json = System.Text.Json.JsonSerializer.Serialize(names);
-    }
-    const serverVariantFolders = @Html.Raw(json);
+    const serverVariantFolders = ["Barbie Desen Varyantlar\u0131","Efekt Desen Varyantlar\u0131","Ekose Desen Varyantlar\u0131","Ete\u011Fi Sulu Desen Varyantlar\u0131","Etnik Desen Varyantlar\u0131","Fiyonk Desen Varyantlar\u0131","Hayvan Desen Varyantlar\u0131","HelloKity Desen Varyantlar\u0131","Kalp Desen Varyantlar\u0131","Kamuflaj Desen Varyantlar\u0131","Kar\u0131\u015F\u0131k Desen Varyantlar\u0131","KazAya\u011F\u0131 Desen Varyantlar\u0131","Kot Desen Varyantlar\u0131","Leopar Desen Varyantlar\u0131","PatchWork Desen Varyantlar\u0131","Puan Desen Varyantlar\u0131","Ta\u015F Desen Varyantlar\u0131","Yaz\u0131 Desen Varyantlar\u0131","Yeni Desen Varyantlar\u0131","Y\u0131lanDerisi Desen Varyantlar\u0131","Y\u0131ld\u0131z Desen Varyantlar\u0131","Zebra Desen Varyantlar\u0131","\u00C7izgi Desen Varyantlar\u0131","\u015Eal Desen Varyantlar\u0131"];
   </script>
 </head>
 <body>
@@ -523,7 +397,7 @@
         <h2>Logo Ayarı</h2>
         <button type="button" class="ghost" id="logo-close">Kapat</button>
       </div>
-      <img id="logo-preview" src="@logoPath" alt="Logo önizleme" style="max-width:240px; height:auto; margin:0 auto;" />
+      <img id="logo-preview" src="/img/orhan-logo.png" alt="Logo önizleme" style="max-width:240px; height:auto; margin:0 auto;" />
       <label class="drop-zone" for="logo-input">
         <strong>Kurumsal logonuzu yükleyin</strong>
         <p style="margin:6px 0 12px;">PNG · JPG · SVG desteklenir · 5MB sınır.</p>
@@ -535,23 +409,12 @@
       </div>
     </div>
   </div>
-  <div class="choice-dialog" id="source-choice-modal">
-    <div class="panel choice-card">
-      <h2>Fotoğraf Kaynağı</h2>
-      <p>Benzer desen araması için fotoğraf kaynağını seçin.</p>
-      <div class="actions">
-        <button type="button" class="primary" id="choice-gallery-btn">📁 Galeriden Seç</button>
-        <button type="button" class="ghost" id="choice-camera-btn">📷 Kameradan Çek</button>
-        <button type="button" class="ghost" id="choice-cancel-btn" style="opacity:.7;">İptal</button>
-      </div>
-    </div>
-  </div>
 
   <main class="grid">
     <section class="panel" id="left-panel" style="display:flex; flex-direction:column; gap:16px;">
       <!-- Logo Frame -->
       <div id="logo-frame" style="background:#2d3748; border:2px solid #4299e1; border-radius:12px; padding:8px; min-height:120px; display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative;" title="Logonuzu değiştirmek için tıklayın">
-        <img id="side-logo" src="@logoPath" data-default="@logoPath" alt="Logo" style="max-width:90%; max-height:100px; object-fit:contain;" />
+        <img id="side-logo" src="/img/orhan-logo.png" data-default="/img/orhan-logo.png" alt="Logo" style="max-width:90%; max-height:100px; object-fit:contain;" />
         <div style="position:absolute; top:4px; right:4px; background:rgba(0,0,0,0.6); padding:4px 8px; border-radius:4px; font-size:10px;">🖼️</div>
       </div>
 
@@ -574,51 +437,18 @@
       </button>
 
       <!-- Klasör Listesi -->
-      <div id="folder-list">
-        <button class="folder-item ghost design-folder-item" data-folder="Çizgi Desenler">
-          <span class="folder-name">Çizgi Desenler</span>
-          <span class="folder-count">(? desen)</span>
-        </button>
-        <button class="folder-item ghost design-folder-item" data-folder="Dar Viskon Desenler">
-          <span class="folder-name">Dar Viskon Desenler</span>
-          <span class="folder-count">(139 desen)</span>
-        </button>
-        <button class="folder-item ghost design-folder-item" data-folder="Ekose Desenler">
-          <span class="folder-name">Ekose Desenler</span>
-          <span class="folder-count">(? desen)</span>
-        </button>
-        <button class="folder-item ghost design-folder-item" data-folder="Eteği Sulu Desenler">
-          <span class="folder-name">Eteği Sulu Desenler</span>
-          <span class="folder-count">(79 desen)</span>
-        </button>
-        <button class="folder-item ghost design-folder-item" data-folder="Geniş Viskon Desenler">
-          <span class="folder-name">Geniş Viskon Desenler</span>
-          <span class="folder-count">(245 desen)</span>
-        </button>
-        <button class="folder-item ghost design-folder-item" data-folder="Karma Desenler">
-          <span class="folder-name">Karma Desenler</span>
-          <span class="folder-count">(? desen)</span>
-        </button>
-        <button class="folder-item ghost design-folder-item" data-folder="Leopar Desenler">
-          <span class="folder-name">Leopar Desenler</span>
-          <span class="folder-count">(83 desen)</span>
-        </button>
-        <button class="folder-item ghost design-folder-item" data-folder="Süet Desenler">
-          <span class="folder-name">Süet Desenler</span>
-          <span class="folder-count">(251 desen)</span>
-        </button>
-        <button class="folder-item ghost design-folder-item" data-folder="Şablonu Olan Desenler">
-          <span class="folder-name">Şablonu Olan Desenler</span>
-          <span class="folder-count">(? desen)</span>
-        </button>
-        <button class="folder-item ghost design-folder-item" data-folder="Turlu Viskon Desenler">
-          <span class="folder-name">Turlu Viskon Desenler</span>
-          <span class="folder-count">(395 desen)</span>
-        </button>
-        <button class="folder-item ghost design-folder-item" data-folder="Yeni Tasarımlar">
-          <span class="folder-name">Yeni Tasarımlar</span>
-          <span class="folder-count">(? desen)</span>
-        </button>
+      <div id="folder-list" style="display:flex; flex-direction:column; gap:6px; max-height:400px; overflow-y:auto;">
+        <button class="folder-item ghost" data-folder="Çizgi Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Çizgi Desenler <span style="color:#ef5350; float:right;">(? desen)</span></button>
+        <button class="folder-item ghost" data-folder="Dar Viskon Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Dar Viskon Desenler <span style="color:#ef5350; float:right;">(139 desen)</span></button>
+        <button class="folder-item ghost" data-folder="Ekose Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Ekose Desenler <span style="color:#ef5350; float:right;">(? desen)</span></button>
+        <button class="folder-item ghost" data-folder="Eteği Sulu Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Eteği Sulu Desenler <span style="color:#ef5350; float:right;">(79 desen)</span></button>
+        <button class="folder-item ghost" data-folder="Geniş Viskon Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Geniş Viskon Desenler <span style="color:#ef5350; float:right;">(245 desen)</span></button>
+        <button class="folder-item ghost" data-folder="Karma Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Karma Desenler <span style="color:#ef5350; float:right;">(? desen)</span></button>
+        <button class="folder-item ghost" data-folder="Leopar Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Leopar Desenler <span style="color:#ef5350; float:right;">(83 desen)</span></button>
+        <button class="folder-item ghost" data-folder="Süet Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Süet Desenler <span style="color:#ef5350; float:right;">(251 desen)</span></button>
+        <button class="folder-item ghost" data-folder="Şablonu Olan Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Şablonu Olan Desenler <span style="color:#ef5350; float:right;">(? desen)</span></button>
+        <button class="folder-item ghost" data-folder="Turlu Viskon Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Turlu Viskon Desenler <span style="color:#ef5350; float:right;">(395 desen)</span></button>
+        <button class="folder-item ghost" data-folder="Yeni Tasarımlar" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Yeni Tasarımlar <span style="color:#ef5350; float:right;">(? desen)</span></button>
       </div>
 
       <!-- Arama -->
@@ -632,7 +462,7 @@
       <button class="ghost" id="remove-from-tag-btn" style="display:none; width:100%; background:#ef4444; border:none; height:40px; font-size:13px; font-weight:bold; color:#fff; opacity:0.5; cursor:not-allowed;" disabled>🗑️ Etiketten Çıkar</button>
 
       <!-- Alt Butonlar -->
-      <button class="primary" id="share-btn" style="width:100%; background:#25D366; border:none; height:44px; font-size:14px; font-weight:bold; opacity:0.5; cursor:not-allowed;" disabled>📥 Seçimleri İndir</button>
+      <button class="primary" id="share-btn" style="width:100%; background:#25D366; border:none; height:44px; font-size:14px; font-weight:bold; opacity:0.5; cursor:not-allowed;" disabled>📤 WhatsApp'a Gönder</button>
       <button class="primary" id="refresh-btn" style="width:100%; background:#4caf50; border:none; height:44px; font-size:14px; font-weight:bold;">🔄 Yenile</button>
       <button class="ghost" id="exit-btn" style="width:100%; background:#f44336; border:none; height:44px; font-size:14px; font-weight:bold; color:#fff;">❌ Çıkış</button>
     </section>
@@ -640,23 +470,34 @@
     <section id="center-panel" style="display:flex; flex-direction:column; gap:12px; flex:1;">
       <section class="panel" style="padding-bottom:8px;">
         <h2 id="main-title">🖼️ Ana Önizleme</h2>
-        <div class="preview-window" style="margin-top:16px; margin-bottom:0;">
+        <div class="preview-window" style="height:500px; margin-top:16px; margin-bottom:0;">
           <img id="main-preview" alt="Ana önizleme" />
         </div>
         
         <!-- Film Şeridi Önizleme -->
-        <div class="filmstrip-block" style="padding-top:12px; border-top:1px solid rgba(148,163,184,.15);">
+        <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(148,163,184,.15);">
           <div id="subfolders-list" class="pill-list" style="margin-bottom:8px;"></div>
           <div id="gallery-grid" class="gallery-grid"></div>
         </div>
       </section>
 
+      <section class="panel">
+        <div class="camera-card">
+          <label for="file-input">Telefon Kamerası</label>
+          <input id="file-input" type="file" accept="image/*" capture="environment" />
+          <div style="display:flex; gap:8px;">
+            <button class="ghost" type="button" id="capture-btn">Kamerayı Aç</button>
+            <button class="primary" type="button" id="analyze-btn" disabled>Aramayı Başlat</button>
+          </div>
+          <small style="color:var(--text-muted);">Desteklenen formatlar: JPG · PNG · BMP · 20MB sınır</small>
+        </div>
+      </section>
     </section>
     <div class="resizer" id="right-resizer"></div>
     <section class="panel" id="right-panel" style="display:flex; flex-direction:column; gap:16px;">
-      <button class="primary" type="button" id="similar-search-btn" style="width:100%; min-height:54px; font-size:15px; margin-bottom:20px; white-space:normal; line-height:1.4;">🔍 Benzer Desen Arama</button>
-      <input id="gallery-file-input" type="file" accept="image/*" style="display:none;" />
-      <input id="camera-file-input" type="file" accept="image/*" capture="environment" style="display:none;" />
+      <button class="primary" type="button" id="archive-search-btn" style="width:100%; height:50px; font-size:16px; margin-bottom:10px;">🔍 Arşivden Ara</button>
+      <button class="primary" type="button" id="search-by-image-btn" style="width:100%; height:46px; font-size:15px; margin-bottom:20px;">📷 Resimden Ara</button>
+      <input id="search-file-input" type="file" accept="image/*" capture="environment" style="display:none;" />
       
       <h2>🏷️ Etiket Yönetimi</h2>
       <div style="margin-top:16px;">
@@ -767,13 +608,12 @@
 })();
 
 const state = {
+  file: null,
   results: [],
   selected: null,
   gallery: [],
   currentCategory: null,
   viewMode: 'design',
-  designFolders: [],
-  currentFolder: null,
   tags: [],
   taggedDesigns: {}, // { 'etiketAdı': [{token, fileName, folder, numara}, ...] }
   activeTag: null, // Şu anda görüntülenen etiket
@@ -796,6 +636,11 @@ const elements = {};
 function getElements() {
   if (elements._initialized) return elements;
   Object.assign(elements, {
+    input: document.getElementById('file-input'),
+    analyze: document.getElementById('analyze-btn'),
+    capturePreview: document.getElementById('capture-preview'),
+    captureLabel: document.getElementById('capture-label'),
+    captureMeta: document.getElementById('capture-meta'),
     matchPreview: document.getElementById('match-preview'),
     matchLabel: document.getElementById('match-label'),
     matchMeta: document.getElementById('match-meta'),
@@ -816,17 +661,13 @@ function getElements() {
     logoModal: document.getElementById('logo-modal'),
     logoClose: document.getElementById('logo-close'),
     logoCloseSecondary: document.getElementById('logo-close-secondary'),
-    sourceChoiceModal: document.getElementById('source-choice-modal'),
-    sourceGalleryBtn: document.getElementById('choice-gallery-btn'),
-    sourceCameraBtn: document.getElementById('choice-camera-btn'),
-    sourceCancelBtn: document.getElementById('choice-cancel-btn'),
     mainPreview: document.getElementById('main-preview'),
     mainTitle: document.getElementById('main-title'),
     btnDesenler: document.getElementById('btn-desenler'),
     btnVaryantlar: document.getElementById('btn-varyantlar'),
-    similarSearchBtn: document.getElementById('similar-search-btn'),
-    galleryFileInput: document.getElementById('gallery-file-input'),
-    cameraFileInput: document.getElementById('camera-file-input'),
+    archiveSearchBtn: document.getElementById('archive-search-btn'),
+    searchBtn: document.getElementById('search-by-image-btn'),
+    searchFile: document.getElementById('search-file-input'),
     searchInput: document.getElementById('search-input'),
     shareBtn: document.getElementById('share-btn'),
     removeFromTagBtn: document.getElementById('remove-from-tag-btn'),
@@ -860,66 +701,12 @@ const bytesToSize = bytes => {
 
 const encodePath = path => btoa(unescape(encodeURIComponent(path)));
 
-function sanitizeFileName(name, fallback = 'desen') {
-  const raw = (name || '').trim();
-  const base = raw ? raw : `${fallback}_${Date.now()}`;
-  const safe = base.replace(/[^a-z0-9_\-.]/gi, '_');
-  return safe || `${fallback}_${Date.now()}`;
-}
-
-function ensureFileExtension(fileName, fallbackExt = 'jpg') {
-  if (/\.[a-z0-9]{2,5}$/i.test(fileName)) {
-    return fileName;
-  }
-  return `${fileName}.${fallbackExt}`;
-}
-
-function buildImageDownloadUrl(item) {
-  if (item?.token) {
-    return `/archive/image?path=${encodeURIComponent(item.token)}&v=${Date.now()}`;
-  }
-  if (item?.folder && item?.fileName) {
-    return `/archive/image/${encodeURIComponent(item.folder)}/${encodeURIComponent(item.fileName)}?v=${Date.now()}`;
-  }
-  return null;
-}
-
-function supportsNativeFileShare(files) {
-  try {
-    return typeof navigator !== 'undefined'
-      && typeof navigator.canShare === 'function'
-      && typeof navigator.share === 'function'
-      && navigator.canShare({ files });
-  } catch (err) {
-    return false;
-  }
-}
-
-function triggerFileDownload(file) {
-  const url = URL.createObjectURL(file);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = file.name;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
-}
-
 function toggleLogoModal(forceOpen) {
   if (!elements.logoModal) return;
   const shouldOpen = typeof forceOpen === 'boolean'
     ? forceOpen
     : !elements.logoModal.classList.contains('open');
   elements.logoModal.classList.toggle('open', shouldOpen);
-}
-
-function toggleSourceChoice(forceOpen) {
-  if (!elements.sourceChoiceModal) return;
-  const shouldOpen = typeof forceOpen === 'boolean'
-    ? forceOpen
-    : !elements.sourceChoiceModal.classList.contains('open');
-  elements.sourceChoiceModal.classList.toggle('open', shouldOpen);
 }
 
 async function pingPython() {
@@ -943,64 +730,68 @@ async function pingPython() {
   }
 }
 
-// Desen klasörlerini backend'den çekip sol panelde gösterir
-async function loadFolderList(){
-  const folderList = document.getElementById('folder-list');
-  if (!folderList) return;
-  folderList.innerHTML = '<div style="padding:20px; text-align:center; color:#4fc3f7;">Desen klasörleri yükleniyor...</div>';
-
-  // Eski hatalı localStorage verilerini temizle (12 desen olan kayıtlar)
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith('folder_count_')) {
-      const value = localStorage.getItem(key);
-      if (value === '12') {
-        localStorage.removeItem(key); // Yanlış değeri sil
+// Desenler sol panelini dolduran yardımcı (mevcut fonksiyon eksikti)
+function loadFolderList(){
+  try {
+    const folderList = document.getElementById('folder-list');
+    if (!folderList) return;
+    
+    // Eski hatalı localStorage verilerini temizle (12 desen olan kayıtlar)
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('folder_count_')) {
+        const value = localStorage.getItem(key);
+        if (value === '12') {
+          localStorage.removeItem(key); // Yanlış değeri sil
+        }
       }
     }
-  }
-
-  try {
-    const resp = await fetch('/archive/folders', { cache: 'no-store' });
-    if (!resp.ok) throw new Error(await resp.text());
-    const folderNames = await resp.json();
-    const folders = Array.isArray(folderNames)
-      ? folderNames.map(name => (typeof name === 'string' ? name.trim() : '')).filter(Boolean)
-      : [];
-
-    state.designFolders = folders;
-
-    if (!folders.length) {
-      folderList.innerHTML = '<div style="padding:20px; text-align:center; color:#ef5350;">Desen klasörü bulunamadı</div>';
-      return;
-    }
-
-    folderList.innerHTML = folders.map(name => {
-      const savedCount = localStorage.getItem(`folder_count_${name}`);
-      const hasCount = savedCount && savedCount !== '0';
-      const countText = hasCount ? `(${savedCount} desen)` : '(yükleniyor...)';
-      return `<button class="folder-item ghost design-folder-item" data-folder="${name}">
-        <span class="folder-name">${name}</span>
-        <span class="folder-count">${countText}</span>
+    
+    // Klasör listesi - başlangıç sayıları ile
+    const folders = [
+      { name: 'Çizgi Desenler', count: 0 },
+      { name: 'Dar Viskon Desenler', count: 139 },
+      { name: 'Ekose Desenler', count: 0 },
+      { name: 'Eteği Sulu Desenler', count: 79 },
+      { name: 'Geniş Viskon Desenler', count: 245 },
+      { name: 'Karma Desenler', count: 0 },
+      { name: 'Leopar Desenler', count: 83 },
+      { name: 'Süet Desenler', count: 251 },
+      { name: 'Şablonu Olan Desenler', count: 0 },
+      { name: 'Turlu Viskon Desenler', count: 395 },
+      { name: 'Yeni Tasarımlar', count: 6 }
+    ];
+    
+    // Klasör HTML'ini oluştur
+    folderList.innerHTML = folders.map(folder => {
+      // localStorage'dan kayıtlı sayıyı al veya başlangıç sayısını kullan
+      const savedCount = localStorage.getItem(`folder_count_${folder.name}`);
+      const count = savedCount ? savedCount : folder.count;
+      const countText = count > 0 ? `(${count} desen)` : '(yükleniyor...)';
+      const countColor = '#00ff00';
+      
+      return `<button class="folder-item ghost" data-folder="${folder.name}" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">
+        ${folder.name} <span style="color:${countColor}; float:right;">${countText}</span>
       </button>`;
     }).join('');
-
-    const rememberedType = localStorage.getItem('lastFolderType');
-    const lastOpened = state.currentFolder || (rememberedType !== 'varyant' ? localStorage.getItem('lastOpenedFolder') : null);
-    if (lastOpened) {
-      highlightDesignFolderButton(lastOpened);
-    }
-
+    
+    // Click handler'ları bağla
+    folderList.querySelectorAll('button[data-folder]')
+      .forEach(btn => {
+        const f = btn.getAttribute('data-folder');
+        if (!f) return;
+        btn.addEventListener('click', () => loadFolderGallery(f));
+      });
+    
+    // Yeni Tasarımlar badge'ine de click handler ekle
     const desenBadge = document.getElementById('yeni-tasarimlar-badge');
     if (desenBadge) {
       desenBadge.addEventListener('click', () => loadFolderGallery('Yeni Tasarımlar'));
     }
-
-    await updateFolderCounts();
-  } catch (err) {
-    console.error('Desen klasörleri yüklenemedi:', err);
-    folderList.innerHTML = '<div style="padding:20px; text-align:center; color:#ef5350;">Klasörler yüklenemedi</div>';
-  }
+    
+    // Klasör sayılarını yükle (arka planda)
+    updateFolderCounts();
+  } catch(_) {}
 }
 
 // Klasörlerin desen sayılarını güncelleyen fonksiyon (sadece 0 olanlar için)
@@ -1013,9 +804,9 @@ async function updateFolderCounts() {
     
     for (const btn of buttons) {
       const folderName = btn.getAttribute('data-folder');
-      const countSpan = btn.querySelector('.folder-count');
+      const span = btn.querySelector('span');
       
-      if (!countSpan) continue;
+      if (!span) continue;
       
       // Eğer localStorage'da kayıtlı sayı varsa, atla (zaten doğru)
       const savedCount = localStorage.getItem(`folder_count_${folderName}`);
@@ -1035,7 +826,8 @@ async function updateFolderCounts() {
           // localStorage'a kaydet
           localStorage.setItem(`folder_count_${folderName}`, count);
           
-            countSpan.textContent = `(${count} desen)`;
+          span.textContent = `(${count} desen)`;
+          span.style.color = '#00ff00';
         }
       } catch (err) {
         console.error(`${folderName} sayısı yüklenemedi:`, err);
@@ -1066,10 +858,27 @@ loadArchiveSamples();
 updateStatistics(); // İstatistikleri yükle
 initVariantBadgeHandler(); // Badge handler'ını başlangıçta ekle
 loadFolderList(); // Klasör listesini yükle ve sayıları göster
-initFolderListHandler(); // Dinamik klasör butonları için delegasyon
 // Varsayılan olarak ilk önizlemeyi getir
 // loadCategoryPreview artık kategori kullanmıyor, doğrudan folder bazlı
 
+elements.input.addEventListener('change', () => {
+  const file = elements.input.files?.[0];
+  state.file = file || null;
+  if (!file) {
+    if (elements.analyze) elements.analyze.disabled = true;
+    elements.capturePreview?.removeAttribute?.('src');
+    if (elements.captureLabel) elements.captureLabel.textContent = 'Hazır';
+    if (elements.captureMeta) elements.captureMeta.textContent = '0 KB';
+    return;
+  }
+  if (elements.analyze) elements.analyze.disabled = false;
+  if (elements.captureLabel) elements.captureLabel.textContent = file.name;
+  if (elements.captureMeta) elements.captureMeta.textContent = `${bytesToSize(file.size)} · ${file.type || 'Bilinmiyor'}`;
+  const url = URL.createObjectURL(file);
+  if (elements.capturePreview) elements.capturePreview.src = url;
+});
+
+document.getElementById('capture-btn').addEventListener('click', () => elements.input.click());
 elements.refreshArchive?.addEventListener('click', () => renderArchivePreview());
 elements.refreshGallerySecondary?.addEventListener('click', () => loadArchiveSamples(true));
 elements.logoInput?.addEventListener('change', () => {
@@ -1097,7 +906,6 @@ elements.logoModal?.addEventListener('click', evt => {
 });
 document.addEventListener('keydown', evt => {
   if (evt.key === 'Escape') toggleLogoModal(false);
-  if (evt.key === 'Escape') toggleSourceChoice(false);
 });
 
 // Sol panel kategori düğmeleri - artık kullanılmıyor (klasör bazlı sistem)
@@ -1185,12 +993,11 @@ async function loadVariantFolders(){
     // İstekleri sıraya alarak (sequential) çalıştır; mobilde zaman aşımı riskini azaltır
     for (const folderName of variantFolders) {
       const btn = document.createElement('button');
-      btn.className = 'folder-item ghost variant-folder-item';
+      btn.className = 'folder-item ghost';
       btn.dataset.folder = folderName;
-      btn.innerHTML = `
-        <span class="folder-name">${folderName}</span>
-        <span class="folder-count">(yükleniyor...)</span>
-      `;
+      btn.style.cssText = 'text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px; cursor:pointer; border-radius:6px; margin-bottom:6px;';
+      btn.innerHTML = `${folderName} <span style="color:#00ff00; float:right;">(yükleniyor...)</span>`;
+      btn.addEventListener('click', () => loadVariantFolder(folderName));
       folderList.appendChild(btn);
       
       // Klasör sayısını sırayla al (await) - mobilde daha stabil
@@ -1226,14 +1033,16 @@ async function fetchVariantCount(folderName, btnElement){
     const list = await fetchVariantsByFolder(folderName);
     cacheVariantFolderData(folderName, list);
     const count = Array.isArray(list) ? list.length : 0;
-    const span = btnElement.querySelector('.folder-count');
+    const span = btnElement.querySelector('span');
     if (span) {
       span.textContent = `(${count} varyant)`;
+      span.style.color = '#00ff00';
     }
   } catch(e) {
-    const span = btnElement.querySelector('.folder-count');
+    const span = btnElement.querySelector('span');
     if (span) {
       span.textContent = '(0 varyant)';
+      span.style.color = '#00ff00';
     }
   }
 }
@@ -1475,21 +1284,6 @@ elements.searchInput?.addEventListener('input', async (e) => {
   }
 });
 
-elements.searchInput?.addEventListener('blur', () => {
-  const cleared = clearDesignSearchIfActive();
-  if (!cleared) return;
-  const isVariantActive = state.viewMode === 'variant' || elements.btnVaryantlar?.classList.contains('active');
-  const isDesignActive = !isVariantActive || elements.btnDesenler?.classList.contains('active');
-  if (isDesignActive) {
-    renderGallery();
-  }
-  if (isVariantActive) {
-    state.variantSearchSeq += 1;
-    state.variantSearchResults = [];
-    renderVariants(state.variants);
-  }
-});
-
 elements.shareBtn?.addEventListener('click', () => {
   shareGallery();
 });
@@ -1559,64 +1353,61 @@ elements.exitBtn?.addEventListener('click', () => {
   }
 });
 
-function initFolderListHandler(){
-  const folderList = document.getElementById('folder-list');
-  if (!folderList || folderList.dataset.clickBound) return;
-  folderList.dataset.clickBound = 'true';
-  folderList.addEventListener('click', async evt => {
-    const btn = evt.target.closest('button[data-folder]');
-    if (!btn || !folderList.contains(btn)) return;
-    await handleFolderButtonClick(btn);
-  });
-}
+// Klasör listesi butonları
+const folderButtons = document.querySelectorAll('.folder-item');
+console.log(`${folderButtons.length} adet klasör butonu bulundu`);
+folderButtons.forEach((btn, index) => {
+  btn.addEventListener('click', async function() {
+    const folderName = this.dataset.folder;
+    console.log(`Klasör ${index + 1} tıklandı: ${folderName}`);
+    // Görsel highlight
+    folderButtons.forEach(b => b.classList.remove('active-folder'));
+    this.classList.add('active-folder');
 
-function highlightDesignFolderButton(folderName){
-  const designButtons = document.querySelectorAll('.folder-item:not(.variant-folder-item)');
-  designButtons.forEach(btn => btn.classList.remove('active-folder'));
-  if (!folderName) return;
-  const target = Array.from(designButtons).find(btn => btn.dataset.folder === folderName);
-  if (target) target.classList.add('active-folder');
-}
+    // Eğer bu bir variant-folder-item ise: desen endpoint'lerini çağırma, varyant akışına yönlendir
+    if (this.classList.contains('variant-folder-item')) {
+      try {
+        state.variantSubfolderFilter = folderName;
+        await loadVariantFolder(folderName);
+      } catch (err) {
+        alert('Varyant klasörü yüklenemedi: ' + err);
+      }
+      return; // Variant akışını tamamladık
+    }
 
-async function handleFolderButtonClick(btn){
-  const folderName = btn.getAttribute('data-folder');
-  if (!folderName) return;
-  if (btn.classList.contains('variant-folder-item')) {
+    // Normal desen klasörü akışı
     try {
-      state.variantSubfolderFilter = folderName;
-      await loadVariantFolder(folderName);
+      // Tek ana önizleme için 1, gallery için ayrıca çağrı yapılacak
+      const params = new URLSearchParams({ take: '1', folder: folderName });
+      // Kategori artık kullanılmıyor
+      const resp = await fetch(`/archive/samples?${params.toString()}`, { cache: 'no-store' });
+      if (!resp.ok) throw new Error(await resp.text());
+      const list = await resp.json();
+      if (Array.isArray(list) && list.length) {
+        setMainPreviewFromItem(list[0]);
+        // Çoklu önizleme galerisi
+        loadFolderGallery(folderName);
+      } else {
+        alert(`${folderName} klasöründe desen bulunamadı.`);
+      }
     } catch (err) {
-      alert('Varyant klasörü yüklenemedi: ' + err);
+      alert('Klasör yüklenemedi: ' + err);
     }
-    return;
-  }
+  });
+});
 
-  highlightDesignFolderButton(folderName);
+// Sağ panel: Arşivden Ara butonu
+elements.archiveSearchBtn?.addEventListener('click', () => {
+  alert('🔍 Arşivden Benzerlik Araması\n\n' +
+        '📌 Bu özellik için:\n' +
+        '1. Ana önizlemedeki desene sağ tıklayın\n' +
+        '2. "Resmi farklı kaydet" seçin\n' +
+        '3. "📷 Resimden Ara" butonuna tıklayın\n' +
+        '4. Kaydettiğiniz dosyayı seçin\n\n' +
+        '💡 Böylece bu desenin benzerlerini bulabilirsiniz!');
+});
 
-  try {
-    const params = new URLSearchParams({ take: '1', folder: folderName });
-    const resp = await fetch(`/archive/samples?${params.toString()}`, { cache: 'no-store' });
-    if (!resp.ok) throw new Error(await resp.text());
-    const list = await resp.json();
-    if (Array.isArray(list) && list.length) {
-      setMainPreviewFromItem(list[0]);
-      loadFolderGallery(folderName);
-    } else {
-      alert(`${folderName} klasöründe desen bulunamadı.`);
-    }
-  } catch (err) {
-    alert('Klasör yüklenemedi: ' + err);
-  }
-}
-
-function triggerSimilarSearch(source) {
-  const input = source === 'camera' ? elements.cameraFileInput : elements.galleryFileInput;
-  if (!input) return;
-  input.value = '';
-  input.click();
-}
-
-// Galeri veya kamera ile dosya seçip yükle
+// Resimden Ara (tek buton): dosya seçtir ve yükle
 async function searchByFile(file) {
   if (!file) return;
   try {
@@ -1642,35 +1433,39 @@ async function searchByFile(file) {
     }
     renderArchivePreview();
   } catch (err) {
-    alert('Benzer desen araması başarısız: ' + err);
+    alert('Resimden arama başarısız: ' + err);
   }
 }
-if (elements.similarSearchBtn) {
-  elements.similarSearchBtn.addEventListener('click', () => toggleSourceChoice(true));
-}
 
-elements.sourceGalleryBtn?.addEventListener('click', () => {
-  toggleSourceChoice(false);
-  triggerSimilarSearch('gallery');
+elements.searchBtn?.addEventListener('click', () => elements.searchFile?.click());
+elements.searchFile?.addEventListener('change', async () => {
+  const f = elements.searchFile?.files?.[0];
+  if (f) await searchByFile(f);
 });
 
-elements.sourceCameraBtn?.addEventListener('click', () => {
-  toggleSourceChoice(false);
-  triggerSimilarSearch('camera');
-});
-
-elements.sourceCancelBtn?.addEventListener('click', () => toggleSourceChoice(false));
-
-elements.sourceChoiceModal?.addEventListener('click', evt => {
-  if (evt.target === elements.sourceChoiceModal) toggleSourceChoice(false);
-});
-
-[elements.galleryFileInput, elements.cameraFileInput].forEach(input => {
-  input?.addEventListener('change', async () => {
-    const f = input.files?.[0];
-    if (f) await searchByFile(f);
-    input.value = '';
-  });
+document.getElementById('analyze-btn').addEventListener('click', async () => {
+  if (!state.file) {
+    alert('Önce telefon kameranızdan fotoğraf çekin.');
+    return;
+  }
+  const fd = new FormData();
+  fd.append('file', state.file);
+  elements.analyze.disabled = true;
+  elements.analyze.textContent = 'Aranıyor…';
+  try {
+    const resp = await fetch('/api/upload', { method: 'POST', body: fd });
+    if (!resp.ok) throw new Error(await resp.text());
+    const json = await resp.json();
+    state.results = json.all_results || [];
+    elements.jsonOutput.textContent = JSON.stringify(json, null, 2);
+    renderResults();
+    if (state.results.length) selectResult(0); else clearMatch();
+  } catch (err) {
+    alert('Arama sırasında hata oluştu:\n' + err);
+  } finally {
+    elements.analyze.disabled = false;
+    elements.analyze.textContent = 'Aramayı Başlat';
+  }
 });
 
 function clearMatch() {
@@ -1800,7 +1595,6 @@ async function loadCategoryPreview(category) {
 
 async function loadCategoryGallery(category) {
   try {
-    const hadMainToken = !!state.mainToken;
     // Etiket görünümünden çıkıyoruz
     state.activeTag = null;
     if (elements.removeFromTagBtn) {
@@ -1814,16 +1608,10 @@ async function loadCategoryGallery(category) {
     if (!resp.ok) throw new Error(await resp.text());
     const list = await resp.json();
     state.gallery = Array.isArray(list) ? list : [];
-    const firstItem = state.gallery.find(item => item && item.token) || null;
-    if (firstItem) {
-      setMainPreviewFromItem(firstItem);
-      queuePreviewUpdate(firstItem);
-    } else {
-      queuePreviewUpdate(null, true);
-    }
     renderGallery();
     if (elements.galleryDescription) elements.galleryDescription.textContent = `Tüm Desenler · ${state.gallery.length} adet önizleme`;
-    if (!hadMainToken && state.mainToken) {
+    if (!state.mainToken && state.gallery.length) {
+      setMainPreviewFromItem(state.gallery[0]);
       autoLoadVariants();
     }
   } catch (err) {
@@ -1832,17 +1620,13 @@ async function loadCategoryGallery(category) {
 }
 
 async function loadFolderGallery(folder) {
-  if (!folder) return;
   try {
-    const hadMainToken = !!state.mainToken;
     // Etiket görünümünden çıkıyoruz
     state.activeTag = null;
     if (elements.removeFromTagBtn) {
       elements.removeFromTagBtn.style.display = 'none';
     }
     state.viewMode = 'design';
-    state.currentFolder = folder;
-    highlightDesignFolderButton(folder);
     
     state.subfolderFilter = null;
     
@@ -1856,18 +1640,12 @@ async function loadFolderGallery(folder) {
     if (!resp.ok) throw new Error(await resp.text());
     const list = await resp.json();
     state.gallery = Array.isArray(list) ? list : [];
-    const firstItem = state.gallery.find(item => item && item.token) || null;
-    if (firstItem) {
-      setMainPreviewFromItem(firstItem);
-      queuePreviewUpdate(firstItem);
-    } else {
-      queuePreviewUpdate(null, true);
-    }
     renderGallery();
     if (elements.galleryDescription) elements.galleryDescription.textContent = `${folder} · ${state.gallery.length} adet önizleme`;
     // Alt klasörler listesi
     renderSubfoldersFromGallery();
-    if (!hadMainToken && state.mainToken) {
+    if (!state.mainToken && state.gallery.length) {
+      setMainPreviewFromItem(state.gallery[0]);
       autoLoadVariants();
     }
   } catch (err) {
@@ -2339,7 +2117,7 @@ function renderGallery() {
   
   // Alt klasör filtresi
   if (state.subfolderFilter) {
-    items = items.filter(entry => resolveFolderName(entry).toLowerCase() === state.subfolderFilter.toLowerCase());
+    items = items.filter(x => (x.folder || '').toLowerCase() === state.subfolderFilter.toLowerCase());
   }
 
   const hasSearch = state.searchQuery && state.searchQuery.length >= 1;
@@ -2445,52 +2223,20 @@ function renderGallery() {
   
   // Film şeridi için sürükle-kaydır yeniden başlat
   initDragScroll();
-  if (state.viewMode === 'design' && !state.activeTag) {
-    renderSubfoldersFromGallery();
-  } else {
-    const host = document.getElementById('subfolders-list');
-    if (host) host.innerHTML = '';
-  }
-}
-
-function clearDesignSearchIfActive() {
-  if (!state.searchQuery) return false;
-  state.searchQuery = '';
-  if (elements.searchInput && elements.searchInput.value) {
-    elements.searchInput.value = '';
-  }
-  return true;
-}
-
-function resolveFolderName(entry) {
-  if (!entry || typeof entry !== 'object') return '';
-  const raw = entry.subfolder || entry.subFolder || entry.folder || '';
-  return typeof raw === 'string' ? raw.trim() : '';
 }
 
 function renderSubfoldersFromGallery(){
   const host = document.getElementById('subfolders-list');
   if (!host) return;
   host.innerHTML = '';
-  const entries = Array.isArray(state.gallery)
-    ? state.gallery.filter(entry => entry && (entry.token || resolveFolderName(entry)))
-    : [];
-  const names = [...new Set(entries.map(resolveFolderName).filter(Boolean))]
-    .sort((a,b)=>a.localeCompare(b,'tr'));
-  if (!names.length) {
-    highlightActiveSubfolder();
-    return;
-  }
+  const items = Array.isArray(state.gallery) ? state.gallery : [];
+  const names = [...new Set(items.map(x => (x.folder||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+  if (!names.length) return;
   const clearBtn = document.createElement('button');
   clearBtn.type = 'button';
   clearBtn.className = 'pill';
   clearBtn.textContent = 'Tümü';
-  clearBtn.addEventListener('click', () => {
-    state.subfolderFilter = null;
-    clearDesignSearchIfActive();
-    renderGallery();
-    highlightActiveSubfolder();
-  });
+  clearBtn.addEventListener('click', () => { state.subfolderFilter = null; renderGallery(); highlightActiveSubfolder(); });
   host.appendChild(clearBtn);
   names.forEach(n => {
     const b = document.createElement('button');
@@ -2498,13 +2244,7 @@ function renderSubfoldersFromGallery(){
     b.className = 'pill';
     b.textContent = n;
     b.dataset.name = n;
-    b.addEventListener('click', () => {
-      const normalized = n.trim();
-      state.subfolderFilter = normalized;
-      clearDesignSearchIfActive();
-      renderGallery();
-      highlightActiveSubfolder();
-    });
+    b.addEventListener('click', () => { state.subfolderFilter = n; renderGallery(); highlightActiveSubfolder(); });
     host.appendChild(b);
   });
   highlightActiveSubfolder();
@@ -2543,49 +2283,20 @@ function rebuildTagLookup(){
 
 // Etiket ekleme işlevi
 function renderTags() {
-  const combobox = elements.tagCombobox;
-  if (combobox) {
-    combobox.innerHTML = '<option value="">-- Etiket seçin --</option>';
-    state.tags.forEach(tag => {
-      const taggedCount = state.taggedDesigns[tag] ? state.taggedDesigns[tag].length : 0;
-      const option = document.createElement('option');
-      option.value = tag;
-      option.textContent = `${tag} ${taggedCount > 0 ? `(${taggedCount})` : ''}`;
-      combobox.appendChild(option);
-    });
-  }
-
-  const tagListHost = elements.tagList;
-  if (tagListHost) {
-    tagListHost.innerHTML = '';
-    if (!state.tags.length) {
-      tagListHost.style.display = 'none';
-    } else {
-      const frag = document.createDocumentFragment();
-      state.tags.forEach(tag => {
-        const count = state.taggedDesigns[tag] ? state.taggedDesigns[tag].length : 0;
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'tag-pill';
-        btn.dataset.tag = tag;
-
-        const labelSpan = document.createElement('span');
-        labelSpan.className = 'tag-pill__label';
-        labelSpan.textContent = tag;
-        btn.appendChild(labelSpan);
-
-        const countSpan = document.createElement('span');
-        countSpan.className = 'tag-pill__count';
-        countSpan.textContent = count > 0 ? `${count}` : '0';
-        btn.appendChild(countSpan);
-
-        frag.appendChild(btn);
-      });
-      tagListHost.appendChild(frag);
-      tagListHost.style.display = 'flex';
-    }
-  }
+  if (!elements.tagCombobox) return;
   
+  // Combobox'ı güncelle
+  elements.tagCombobox.innerHTML = '<option value="">-- Etiket seçin --</option>';
+  
+  state.tags.forEach((tag) => {
+    const taggedCount = state.taggedDesigns[tag] ? state.taggedDesigns[tag].length : 0;
+    const option = document.createElement('option');
+    option.value = tag;
+    option.textContent = `${tag} ${taggedCount > 0 ? `(${taggedCount})` : ''}`;
+    elements.tagCombobox.appendChild(option);
+  });
+  
+  // İstatistikleri güncelle
   updateStatistics();
 }
 
@@ -2699,18 +2410,6 @@ elements.tagCombobox?.addEventListener('change', (e) => {
   }
 });
 
-elements.tagList?.addEventListener('click', evt => {
-  const btn = evt.target.closest('button.tag-pill');
-  if (!btn || !elements.tagList.contains(btn)) return;
-  const tagName = btn.dataset.tag;
-  if (tagName) {
-    showTaggedDesigns(tagName);
-    if (elements.tagCombobox) {
-      elements.tagCombobox.value = tagName;
-    }
-  }
-});
-
 // Seçilileri combobox'taki etikete ekle
 elements.tagAddSelectedBtn?.addEventListener('click', async () => {
   const selectedTag = elements.tagCombobox?.value;
@@ -2739,12 +2438,7 @@ elements.tagDeleteBtn?.addEventListener('click', async () => {
         if (elements.removeFromTagBtn) {
           elements.removeFromTagBtn.style.display = 'none';
         }
-        const fallbackFolder = state.currentFolder || state.designFolders?.[0] || null;
-        if (fallbackFolder) {
-          loadFolderGallery(fallbackFolder);
-        } else {
-          loadFolderList();
-        }
+        loadFolderGallery(state.currentFolder || variantFolders[0]);
       }
     }
   }
@@ -3099,65 +2793,57 @@ function updateSelectionUI() {
 
 // Mobil paylaşım (WhatsApp, Mail, vb.)
 async function shareGallery() {
-  const isVariantsTab = elements.btnVaryantlar?.classList.contains('active');
-  const items = isVariantsTab ? state.selectedVariants : state.selectedDesigns;
-  if (items.length === 0) {
-    alert(isVariantsTab 
-      ? 'Lütfen önce indirmek istediğiniz varyantları seçin!'
-      : 'Lütfen önce indirmek istediğiniz desenleri seçin!');
-    return;
-  }
-  const shareBtn = elements.shareBtn;
-  if (shareBtn) {
-    shareBtn.dataset.originalLabel = shareBtn.dataset.originalLabel || shareBtn.textContent || '📥 Seçimleri İndir';
-    shareBtn.disabled = true;
-    shareBtn.textContent = 'Seçimler hazırlanıyor…';
-  }
   try {
+    // Hangi tab aktif kontrol et
+    const isVariantsTab = elements.btnVaryantlar?.classList.contains('active');
+    const items = isVariantsTab ? state.selectedVariants : state.selectedDesigns;
+    
+    if (items.length === 0) {
+      alert(isVariantsTab 
+        ? 'Lütfen önce paylaşmak istediğiniz varyantları seçin!'
+        : 'Lütfen önce paylaşmak istediğiniz desenleri seçin!');
+      return;
+    }
+    
+    // WhatsApp başlık
     const shareTitle = state.searchQuery 
       ? `${isVariantsTab ? 'Varyant' : 'Desen'} Arama: "${state.searchQuery}"`
       : state.subfolderFilter 
         ? `${state.subfolderFilter} ${isVariantsTab ? 'Varyantları' : 'Desenleri'}`
         : isVariantsTab ? 'Varyant Koleksiyonu' : 'Desen Koleksiyonu';
-    const shareDetails = `${items.length} adet ${isVariantsTab ? 'varyant' : 'desen'} hazırlandı.`;
-    const files = [];
+    
+    let whatsappMessage = `*${shareTitle}*\n\n${items.length} adet ${isVariantsTab ? 'varyant' : 'desen'}:\n\n`;
+    
+    // Her resim için base64 fetche et ve mesaja ekle
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      const imageUrl = buildImageDownloadUrl(item);
-      if (!imageUrl) {
-        console.warn('Görsel URL oluşturulamadı', item);
-        continue;
+      const baseUrl = window.location.origin;
+      const imageUrl = `${baseUrl}/archive/image/${encodeURIComponent(item.folder)}/${encodeURIComponent(item.fileName)}`;
+      
+      try {
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+          const base64 = e.target.result.split(',')[1];
+          // Base64 resim linki oluştur (data URL)
+          whatsappMessage += `${i+1}. ${item.fileName}\n[Resim](data:image/jpeg;base64,${base64.substring(0, 100)}...)\n\n`;
+        };
+        reader.readAsDataURL(blob);
+      } catch (e) {
+        console.error(`Resim yüklenemedi: ${item.fileName}`, e);
+        whatsappMessage += `${i+1}. ${item.fileName}\n[Yüklenemedi]\n\n`;
       }
-      const response = await fetch(imageUrl, { cache: 'no-store' });
-      if (!response.ok) {
-        throw new Error(`${item.fileName || 'Görsel'} indirilemedi (HTTP ${response.status})`);
-      }
-      const blob = await response.blob();
-      const ext = blob.type.includes('png') ? 'png'
-        : blob.type.includes('webp') ? 'webp'
-        : blob.type.includes('bmp') ? 'bmp'
-        : 'jpg';
-      const safeBase = sanitizeFileName(item.fileName || `desen_${i+1}`);
-      const fileName = ensureFileExtension(safeBase, ext);
-      files.push(new File([blob], fileName, { type: blob.type || `image/${ext}` }));
     }
-    if (!files.length) {
-      alert('Seçili görseller indirilemedi. Lütfen tekrar deneyin.');
-      return;
-    }
-    if (supportsNativeFileShare(files)) {
-      await navigator.share({ files, text: shareDetails, title: shareTitle });
-      return;
-    }
-    files.forEach(triggerFileDownload);
+    
+    // WhatsApp'a aç
+    const whatsappText = encodeURIComponent(whatsappMessage);
+    window.open(`https://wa.me/?text=${whatsappText}`, '_blank');
+    
   } catch(err) {
     console.error('Paylaşım hatası:', err);
     alert('Paylaşım yapılamadı: ' + err.message);
-  } finally {
-    if (shareBtn) {
-      shareBtn.textContent = shareBtn.dataset.originalLabel || '📥 Seçimleri İndir';
-    }
-    updateSelectionUI();
   }
 }
 

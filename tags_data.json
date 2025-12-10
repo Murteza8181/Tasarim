@@ -1,25 +1,13 @@
 {
   "tags": [
     "Test",
-    "Test2",
-    "Test5",
-    "Murti",
-    "Etni̇k",
-    "Mmm"
+    "Test5"
   ],
   "taggedDesigns": {
     "Test": [
       {
         "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcS2FyYWtvw6cgVGFzYXLEsW1sYXJcTGVvcGFyIERlc2VubGVyXFQtNTYxIEsuanBn",
         "fileName": "T-561 K.jpg",
-        "folder": "Leopar Desenler",
-        "numara": null
-      }
-    ],
-    "Test2": [
-      {
-        "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcS2FyYWtvw6cgVGFzYXLEsW1sYXJcTGVvcGFyIERlc2VubGVyXFQtNTU5ICBLLmpwZw==",
-        "fileName": "T-559  K.jpg",
         "folder": "Leopar Desenler",
         "numara": null
       }
@@ -41,42 +29,6 @@
         "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcVkFSWUFOVCAtIMWeYWJsb251IE9sYW4gRGVzZW5sZXJcRWtvc2UgRGVzZW4gVmFyeWFudGxhcsSxXDIwMDA5LmpwZw==",
         "fileName": "20009.jpg",
         "folder": "Ekose Desen Varyantları",
-        "numara": null
-      }
-    ],
-    "Murti": [
-      {
-        "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcVkFSWUFOVCAtIMWeYWJsb251IE9sYW4gRGVzZW5sZXJcRXRuaWsgRGVzZW4gVmFyeWFudGxhcsSxXDIwMDk0LmpwZw==",
-        "fileName": "20094.jpg",
-        "folder": "Etnik Desen Varyantları",
-        "numara": null
-      },
-      {
-        "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcVkFSWUFOVCAtIMWeYWJsb251IE9sYW4gRGVzZW5sZXJcRXRuaWsgRGVzZW4gVmFyeWFudGxhcsSxXDIwMjM2LmpwZw==",
-        "fileName": "20236.jpg",
-        "folder": "Etnik Desen Varyantları",
-        "numara": null
-      },
-      {
-        "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcVkFSWUFOVCAtIMWeYWJsb251IE9sYW4gRGVzZW5sZXJcRXRuaWsgRGVzZW4gVmFyeWFudGxhcsSxXDIwMjMxLmpwZw==",
-        "fileName": "20231.jpg",
-        "folder": "Etnik Desen Varyantları",
-        "numara": null
-      }
-    ],
-    "Etni̇k": [
-      {
-        "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcVkFSWUFOVCAtIMWeYWJsb251IE9sYW4gRGVzZW5sZXJcRXRuaWsgRGVzZW4gVmFyeWFudGxhcsSxXDIwMjMxLmpwZw==",
-        "fileName": "20231.jpg",
-        "folder": "Etnik Desen Varyantları",
-        "numara": null
-      }
-    ],
-    "Mmm": [
-      {
-        "token": "RTpcVGFzYXLEsW1WZVNhYmxvbnVPbGFuRGVzZW5sZXJcS2FyYWtvw6cgVGFzYXLEsW1sYXJcxZ5hYmxvbnUgT2xhbiBEZXNlbmxlclwyMDI4MyAtIE9yaWppbmFsLmpwZw==",
-        "fileName": "20283 - Orijinal.jpg",
-        "folder": "Şablonu Olan Desenler",
         "numara": null
       }
     ]

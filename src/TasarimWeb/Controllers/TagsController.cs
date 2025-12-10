@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -8,6 +9,7 @@ namespace TasarimWeb.Controllers
 {
     [Route("api/tags")]
     [ApiController]
+    [Authorize]
     public class TagsController : ControllerBase
     {
         private readonly IHttpClientFactory _clientFactory;

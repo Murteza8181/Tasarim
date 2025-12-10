@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
 
@@ -5,6 +6,7 @@ namespace TasarimWeb.Controllers
 {
     [ApiController]
     [Route("archive")]
+    [Authorize]
     public class ArchiveController : ControllerBase
     {
         private readonly IConfiguration _config;
@@ -15,7 +17,7 @@ namespace TasarimWeb.Controllers
         }
 
         [HttpGet("samples")]
-        public IActionResult GetSamples([FromQuery] int take = 12, [FromQuery] string? category = null, [FromQuery] string? folder = null)
+        public IActionResult GetSamples([FromQuery] int? take = null, [FromQuery] string? category = null, [FromQuery] string? folder = null)
         {
             var basePath = _config["DesenKlasoru"];
             if (string.IsNullOrWhiteSpace(basePath) || !Directory.Exists(basePath))
@@ -37,9 +39,15 @@ namespace TasarimWeb.Controllers
             }
 
             var extensions = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
-            var files = Directory.EnumerateFiles(searchPath, "*.*", SearchOption.AllDirectories)
-                .Where(f => extensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
-                .Take(take)
+            var fileQuery = Directory.EnumerateFiles(searchPath, "*.*", SearchOption.AllDirectories)
+                .Where(f => extensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
+
+            if (take.HasValue && take.Value > 0)
+            {
+                fileQuery = fileQuery.Take(take.Value);
+            }
+
+            var files = fileQuery
                 .Select(fullPath =>
                 {
                     var token = Convert.ToBase64String(Encoding.UTF8.GetBytes(fullPath));
@@ -92,7 +100,7 @@ namespace TasarimWeb.Controllers
         }
 
         [HttpGet("variants")]
-        public IActionResult GetVariants([FromQuery] string path, [FromQuery] int take = 12)
+        public IActionResult GetVariants([FromQuery] string path, [FromQuery] int? take = null)
         {
             if (string.IsNullOrWhiteSpace(path))
                 return BadRequest(new { error = "Token eksik" });
@@ -128,9 +136,15 @@ namespace TasarimWeb.Controllers
                 }
 
                 // Varyant klasöründeki TÜM görsel dosyaları döndür (kategori bazlı varyantlar)
-                var candidates = Directory.EnumerateFiles(variantFolderPath)
-                    .Where(f => IsImageExtension(f))
-                    .Take(take)
+                var variantQuery = Directory.EnumerateFiles(variantFolderPath)
+                    .Where(f => IsImageExtension(f));
+
+                if (take.HasValue && take.Value > 0)
+                {
+                    variantQuery = variantQuery.Take(take.Value);
+                }
+
+                var candidates = variantQuery
                     .Select(f => new
                     {
                         token = Convert.ToBase64String(Encoding.UTF8.GetBytes(f)),
@@ -178,7 +192,7 @@ namespace TasarimWeb.Controllers
         }
 
         [HttpGet("variants-by-folder")]
-        public IActionResult GetVariantsByFolder([FromQuery] string folder, [FromQuery] int limit = 100)
+        public IActionResult GetVariantsByFolder([FromQuery] string folder, [FromQuery] int? limit = null)
         {
             if (string.IsNullOrWhiteSpace(folder))
                 return BadRequest(new { error = "Klasör adı eksik" });
@@ -192,9 +206,15 @@ namespace TasarimWeb.Controllers
                 return NotFound(new { error = $"Klasör bulunamadı: {folder}" });
 
             var extensions = new[] { ".jpg", ".jpeg", ".png" };
-            var items = Directory.EnumerateFiles(folderPath)
-                .Where(f => extensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
-                .Take(limit)
+            var itemQuery = Directory.EnumerateFiles(folderPath)
+                .Where(f => extensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
+
+            if (limit.HasValue && limit.Value > 0)
+            {
+                itemQuery = itemQuery.Take(limit.Value);
+            }
+
+            var items = itemQuery
                 .Select(fullPath =>
                 {
                     var token = Convert.ToBase64String(Encoding.UTF8.GetBytes(fullPath));

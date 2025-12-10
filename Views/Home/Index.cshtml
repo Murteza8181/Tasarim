@@ -97,6 +97,14 @@
       border: 1px solid var(--border);
       box-shadow: 0 20px 40px rgba(2,6,23,.45);
     }
+    #folder-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-right: 6px;
+      max-height: 420px;
+      overflow-y: auto;
+    }
     .panel-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
     .panel h2 { margin: 0 0 12px; font-size: 1.05rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
     .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
@@ -112,8 +120,13 @@
     }
     select:disabled { opacity: .6; cursor: not-allowed; }
     .pill-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    #tag-list {
+      display: none;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
     .pill { padding: 4px 12px; border-radius: 999px; font-size: .8rem; background: rgba(156,39,176,.2); color: #e1bee7; border: 1px solid rgba(156,39,176,.5); cursor: pointer; transition: all 0.2s ease; }
-    .pill.search-pill { background: rgba(248,113,113,.2); color: #fecaca; border-color: rgba(248,113,113,.5); }
     .pill:hover { background: rgba(156,39,176,.3); border-color: rgba(156,39,176,.7); }
     button {
       border: none;
@@ -142,6 +155,66 @@
       background: rgba(15,23,42,.6);
       color: var(--text-muted);
       border: 1px solid rgba(148,163,184,.2);
+    }
+    button.folder-item {
+      width: 100%;
+      border: 1px solid rgba(59,130,246,.45);
+      border-radius: 14px;
+      padding: 13px 16px;
+      background: linear-gradient(135deg, #1f3b63, #112036);
+      color: #fff;
+      font-size: .85rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+      transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+    }
+    button.folder-item .folder-name {
+      flex: 1;
+      text-align: left;
+      letter-spacing: .02em;
+    }
+    button.folder-item .folder-count {
+      color: #8bffd5;
+      font-weight: 700;
+      font-size: .9rem;
+    }
+    button.folder-item:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 18px rgba(15,23,42,.55);
+      border-color: rgba(99,102,241,.75);
+    }
+    .tag-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid rgba(236,72,153,.4);
+      border-radius: 999px;
+      padding: 6px 14px;
+      background: rgba(236,72,153,.15);
+      color: #fbcfe8;
+      font-size: .85rem;
+      cursor: pointer;
+      transition: transform .12s ease, border-color .12s ease, background .12s ease;
+    }
+    .tag-pill__label { text-transform: capitalize; letter-spacing: .03em; }
+    .tag-pill__count {
+      min-width: 26px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(236,72,153,.25);
+      font-weight: 700;
+      text-align: center;
+      color: #fff;
+      font-size: .85rem;
+    }
+    .tag-pill:hover {
+      transform: translateY(-1px);
+      border-color: rgba(236,72,153,.8);
+      background: rgba(236,72,153,.25);
     }
     button:hover:not(:disabled) { transform: translateY(-2px); }
     .preview-card, .result-card {
@@ -249,8 +322,6 @@
       min-height: 160px;
       cursor: grab;
     }
-    .gallery-grid.search-strip { cursor: pointer; }
-    .gallery-grid.search-strip .gallery-item { min-width: 140px; }
     .gallery-grid:active {
       cursor: grabbing;
     }
@@ -258,22 +329,6 @@
     .gallery-grid::-webkit-scrollbar-track { background: rgba(148,163,184,.1); border-radius: 4px; }
     .gallery-grid::-webkit-scrollbar-thumb { background: rgba(59,130,246,.4); border-radius: 4px; }
     .gallery-grid::-webkit-scrollbar-thumb:hover { background: rgba(59,130,246,.6); }
-    .gallery-grid .score-chip {
-      position: absolute;
-      top: 6px;
-      right: 6px;
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: .75rem;
-      background: rgba(2,6,23,.75);
-      color: #93c5fd;
-      border: 1px solid rgba(148,163,184,.35);
-    }
-    .gallery-grid.search-strip .score-chip {
-      background: rgba(248,113,113,.9);
-      color: #fff;
-      border-color: rgba(248,113,113,.4);
-    }
     
     /* Checkbox stilleri */
     .design-checkbox {
@@ -435,7 +490,11 @@
     }
     /* Aktif durum stilleri */
     .active-category { outline: 2px solid #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.15); }
-    .folder-item.active-folder { background:#0d47a1 !important; box-shadow: 0 0 0 2px rgba(255,255,255,.25); }
+    .folder-item.active-folder {
+      border-color: rgba(34,197,94,.95) !important;
+      box-shadow: 0 0 0 2px rgba(34,197,94,.35);
+      background: linear-gradient(135deg, #114f2c, #0b2916);
+    }
   </style>
   <script>
     // Sunucu tarafında bulunan varyant klasörleri (mevcut dizinlerden alınır)
@@ -515,18 +574,51 @@
       </button>
 
       <!-- Klasör Listesi -->
-      <div id="folder-list" style="display:flex; flex-direction:column; gap:6px; max-height:400px; overflow-y:auto;">
-        <button class="folder-item ghost" data-folder="Çizgi Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Çizgi Desenler <span style="color:#ef5350; float:right;">(? desen)</span></button>
-        <button class="folder-item ghost" data-folder="Dar Viskon Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Dar Viskon Desenler <span style="color:#ef5350; float:right;">(139 desen)</span></button>
-        <button class="folder-item ghost" data-folder="Ekose Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Ekose Desenler <span style="color:#ef5350; float:right;">(? desen)</span></button>
-        <button class="folder-item ghost" data-folder="Eteği Sulu Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Eteği Sulu Desenler <span style="color:#ef5350; float:right;">(79 desen)</span></button>
-        <button class="folder-item ghost" data-folder="Geniş Viskon Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Geniş Viskon Desenler <span style="color:#ef5350; float:right;">(245 desen)</span></button>
-        <button class="folder-item ghost" data-folder="Karma Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Karma Desenler <span style="color:#ef5350; float:right;">(? desen)</span></button>
-        <button class="folder-item ghost" data-folder="Leopar Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Leopar Desenler <span style="color:#ef5350; float:right;">(83 desen)</span></button>
-        <button class="folder-item ghost" data-folder="Süet Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Süet Desenler <span style="color:#ef5350; float:right;">(251 desen)</span></button>
-        <button class="folder-item ghost" data-folder="Şablonu Olan Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Şablonu Olan Desenler <span style="color:#ef5350; float:right;">(? desen)</span></button>
-        <button class="folder-item ghost" data-folder="Turlu Viskon Desenler" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Turlu Viskon Desenler <span style="color:#ef5350; float:right;">(395 desen)</span></button>
-        <button class="folder-item ghost" data-folder="Yeni Tasarımlar" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">Yeni Tasarımlar <span style="color:#ef5350; float:right;">(? desen)</span></button>
+      <div id="folder-list">
+        <button class="folder-item ghost design-folder-item" data-folder="Çizgi Desenler">
+          <span class="folder-name">Çizgi Desenler</span>
+          <span class="folder-count">(? desen)</span>
+        </button>
+        <button class="folder-item ghost design-folder-item" data-folder="Dar Viskon Desenler">
+          <span class="folder-name">Dar Viskon Desenler</span>
+          <span class="folder-count">(139 desen)</span>
+        </button>
+        <button class="folder-item ghost design-folder-item" data-folder="Ekose Desenler">
+          <span class="folder-name">Ekose Desenler</span>
+          <span class="folder-count">(? desen)</span>
+        </button>
+        <button class="folder-item ghost design-folder-item" data-folder="Eteği Sulu Desenler">
+          <span class="folder-name">Eteği Sulu Desenler</span>
+          <span class="folder-count">(79 desen)</span>
+        </button>
+        <button class="folder-item ghost design-folder-item" data-folder="Geniş Viskon Desenler">
+          <span class="folder-name">Geniş Viskon Desenler</span>
+          <span class="folder-count">(245 desen)</span>
+        </button>
+        <button class="folder-item ghost design-folder-item" data-folder="Karma Desenler">
+          <span class="folder-name">Karma Desenler</span>
+          <span class="folder-count">(? desen)</span>
+        </button>
+        <button class="folder-item ghost design-folder-item" data-folder="Leopar Desenler">
+          <span class="folder-name">Leopar Desenler</span>
+          <span class="folder-count">(83 desen)</span>
+        </button>
+        <button class="folder-item ghost design-folder-item" data-folder="Süet Desenler">
+          <span class="folder-name">Süet Desenler</span>
+          <span class="folder-count">(251 desen)</span>
+        </button>
+        <button class="folder-item ghost design-folder-item" data-folder="Şablonu Olan Desenler">
+          <span class="folder-name">Şablonu Olan Desenler</span>
+          <span class="folder-count">(? desen)</span>
+        </button>
+        <button class="folder-item ghost design-folder-item" data-folder="Turlu Viskon Desenler">
+          <span class="folder-name">Turlu Viskon Desenler</span>
+          <span class="folder-count">(395 desen)</span>
+        </button>
+        <button class="folder-item ghost design-folder-item" data-folder="Yeni Tasarımlar">
+          <span class="folder-name">Yeni Tasarımlar</span>
+          <span class="folder-count">(? desen)</span>
+        </button>
       </div>
 
       <!-- Arama -->
@@ -565,12 +657,6 @@
       <button class="primary" type="button" id="similar-search-btn" style="width:100%; min-height:54px; font-size:15px; margin-bottom:20px; white-space:normal; line-height:1.4;">🔍 Benzer Desen Arama</button>
       <input id="gallery-file-input" type="file" accept="image/*" style="display:none;" />
       <input id="camera-file-input" type="file" accept="image/*" capture="environment" style="display:none;" />
-
-      <div class="capture-preview-card" aria-label="Arama görseli" style="padding:0; border-radius:18px; background:rgba(8,15,32,0.65); border:1px solid rgba(59,130,246,0.2); overflow:hidden;">
-        <div id="capture-frame" style="width:100%; aspect-ratio:1 / 1; border-radius:18px; background:repeating-linear-gradient(45deg, rgba(148,163,184,0.18) 0 12px, rgba(8,15,32,0.8) 12px 24px); border:1px dashed rgba(148,163,184,0.35); display:flex; align-items:center; justify-content:center; overflow:hidden; transition:background .3s ease, border .3s ease;">
-          <img id="capture-preview" alt="Arama için seçilen görsel" style="width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .25s ease; display:block;" />
-        </div>
-      </div>
       
       <h2>🏷️ Etiket Yönetimi</h2>
       <div style="margin-top:16px;">
@@ -686,6 +772,8 @@ const state = {
   gallery: [],
   currentCategory: null,
   viewMode: 'design',
+  designFolders: [],
+  currentFolder: null,
   tags: [],
   taggedDesigns: {}, // { 'etiketAdı': [{token, fileName, folder, numara}, ...] }
   activeTag: null, // Şu anda görüntülenen etiket
@@ -702,8 +790,8 @@ const state = {
   selectedDesigns: [], // Seçili desenler: {token, fileName, folder, numara}
   selectedVariants: [], // Seçili varyantlar
   tagLookup: {}, // Token -> etiket listesi
-  searchFilmstrip: [],
-  searchContext: null
+  pendingPreviewToken: null,
+  pendingPreviewFallback: false
 };
 // Element referanslarını lazy olarak al (DOM hazır olduğunda)
 const elements = {};
@@ -734,8 +822,6 @@ function getElements() {
     sourceGalleryBtn: document.getElementById('choice-gallery-btn'),
     sourceCameraBtn: document.getElementById('choice-camera-btn'),
     sourceCancelBtn: document.getElementById('choice-cancel-btn'),
-    captureFrame: document.getElementById('capture-frame'),
-    capturePreview: document.getElementById('capture-preview'),
     mainPreview: document.getElementById('main-preview'),
     mainTitle: document.getElementById('main-title'),
     btnDesenler: document.getElementById('btn-desenler'),
@@ -775,14 +861,6 @@ const bytesToSize = bytes => {
 };
 
 const encodePath = path => btoa(unescape(encodeURIComponent(path)));
-
-const captureFrameStyles = {
-  emptyBg: 'repeating-linear-gradient(45deg, rgba(148,163,184,0.18) 0 12px, rgba(8,15,32,0.8) 12px 24px)',
-  filledBg: 'rgba(2,6,23,0.35)',
-  emptyBorder: '1px dashed rgba(148,163,184,0.35)',
-  filledBorder: '1px solid rgba(59,130,246,0.35)'
-};
-let capturePreviewObjectUrl = null;
 
 function sanitizeFileName(name, fallback = 'desen') {
   const raw = (name || '').trim();
@@ -867,68 +945,64 @@ async function pingPython() {
   }
 }
 
-// Desenler sol panelini dolduran yardımcı (mevcut fonksiyon eksikti)
-function loadFolderList(){
-  try {
-    const folderList = document.getElementById('folder-list');
-    if (!folderList) return;
-    
-    // Eski hatalı localStorage verilerini temizle (12 desen olan kayıtlar)
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('folder_count_')) {
-        const value = localStorage.getItem(key);
-        if (value === '12') {
-          localStorage.removeItem(key); // Yanlış değeri sil
-        }
+// Desen klasörlerini backend'den çekip sol panelde gösterir
+async function loadFolderList(){
+  const folderList = document.getElementById('folder-list');
+  if (!folderList) return;
+  folderList.innerHTML = '<div style="padding:20px; text-align:center; color:#4fc3f7;">Desen klasörleri yükleniyor...</div>';
+
+  // Eski hatalı localStorage verilerini temizle (12 desen olan kayıtlar)
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('folder_count_')) {
+      const value = localStorage.getItem(key);
+      if (value === '12') {
+        localStorage.removeItem(key); // Yanlış değeri sil
       }
     }
-    
-    // Klasör listesi - başlangıç sayıları ile
-    const folders = [
-      { name: 'Çizgi Desenler', count: 0 },
-      { name: 'Dar Viskon Desenler', count: 139 },
-      { name: 'Ekose Desenler', count: 0 },
-      { name: 'Eteği Sulu Desenler', count: 79 },
-      { name: 'Geniş Viskon Desenler', count: 245 },
-      { name: 'Karma Desenler', count: 0 },
-      { name: 'Leopar Desenler', count: 83 },
-      { name: 'Süet Desenler', count: 251 },
-      { name: 'Şablonu Olan Desenler', count: 0 },
-      { name: 'Turlu Viskon Desenler', count: 395 },
-      { name: 'Yeni Tasarımlar', count: 6 }
-    ];
-    
-    // Klasör HTML'ini oluştur
-    folderList.innerHTML = folders.map(folder => {
-      // localStorage'dan kayıtlı sayıyı al veya başlangıç sayısını kullan
-      const savedCount = localStorage.getItem(`folder_count_${folder.name}`);
-      const count = savedCount ? savedCount : folder.count;
-      const countText = count > 0 ? `(${count} desen)` : '(yükleniyor...)';
-      const countColor = '#00ff00';
-      
-      return `<button class="folder-item ghost" data-folder="${folder.name}" style="text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px;">
-        ${folder.name} <span style="color:${countColor}; float:right;">${countText}</span>
+  }
+
+  try {
+    const resp = await fetch('/archive/folders', { cache: 'no-store' });
+    if (!resp.ok) throw new Error(await resp.text());
+    const folderNames = await resp.json();
+    const folders = Array.isArray(folderNames)
+      ? folderNames.map(name => (typeof name === 'string' ? name.trim() : '')).filter(Boolean)
+      : [];
+
+    state.designFolders = folders;
+
+    if (!folders.length) {
+      folderList.innerHTML = '<div style="padding:20px; text-align:center; color:#ef5350;">Desen klasörü bulunamadı</div>';
+      return;
+    }
+
+    folderList.innerHTML = folders.map(name => {
+      const savedCount = localStorage.getItem(`folder_count_${name}`);
+      const hasCount = savedCount && savedCount !== '0';
+      const countText = hasCount ? `(${savedCount} desen)` : '(yükleniyor...)';
+      return `<button class="folder-item ghost design-folder-item" data-folder="${name}">
+        <span class="folder-name">${name}</span>
+        <span class="folder-count">${countText}</span>
       </button>`;
     }).join('');
-    
-    // Click handler'ları bağla
-    folderList.querySelectorAll('button[data-folder]')
-      .forEach(btn => {
-        const f = btn.getAttribute('data-folder');
-        if (!f) return;
-        btn.addEventListener('click', () => loadFolderGallery(f));
-      });
-    
-    // Yeni Tasarımlar badge'ine de click handler ekle
+
+    const rememberedType = localStorage.getItem('lastFolderType');
+    const lastOpened = state.currentFolder || (rememberedType !== 'varyant' ? localStorage.getItem('lastOpenedFolder') : null);
+    if (lastOpened) {
+      highlightDesignFolderButton(lastOpened);
+    }
+
     const desenBadge = document.getElementById('yeni-tasarimlar-badge');
     if (desenBadge) {
       desenBadge.addEventListener('click', () => loadFolderGallery('Yeni Tasarımlar'));
     }
-    
-    // Klasör sayılarını yükle (arka planda)
-    updateFolderCounts();
-  } catch(_) {}
+
+    await updateFolderCounts();
+  } catch (err) {
+    console.error('Desen klasörleri yüklenemedi:', err);
+    folderList.innerHTML = '<div style="padding:20px; text-align:center; color:#ef5350;">Klasörler yüklenemedi</div>';
+  }
 }
 
 // Klasörlerin desen sayılarını güncelleyen fonksiyon (sadece 0 olanlar için)
@@ -941,7 +1015,7 @@ async function updateFolderCounts() {
     
     for (const btn of buttons) {
       const folderName = btn.getAttribute('data-folder');
-      const span = btn.querySelector('span');
+      const span = btn.querySelector('.folder-count');
       
       if (!span) continue;
       
@@ -964,7 +1038,7 @@ async function updateFolderCounts() {
           localStorage.setItem(`folder_count_${folderName}`, count);
           
           span.textContent = `(${count} desen)`;
-          span.style.color = '#00ff00';
+          span.style.color = '#72facc';
         }
       } catch (err) {
         console.error(`${folderName} sayısı yüklenemedi:`, err);
@@ -995,6 +1069,7 @@ loadArchiveSamples();
 updateStatistics(); // İstatistikleri yükle
 initVariantBadgeHandler(); // Badge handler'ını başlangıçta ekle
 loadFolderList(); // Klasör listesini yükle ve sayıları göster
+initFolderListHandler(); // Dinamik klasör butonları için delegasyon
 // Varsayılan olarak ilk önizlemeyi getir
 // loadCategoryPreview artık kategori kullanmıyor, doğrudan folder bazlı
 
@@ -1113,11 +1188,9 @@ async function loadVariantFolders(){
     // İstekleri sıraya alarak (sequential) çalıştır; mobilde zaman aşımı riskini azaltır
     for (const folderName of variantFolders) {
       const btn = document.createElement('button');
-      btn.className = 'folder-item ghost';
+      btn.className = 'folder-item ghost variant-folder-item';
       btn.dataset.folder = folderName;
-      btn.style.cssText = 'text-align:left; padding:10px; background:#1976d2; border:none; color:#fff; font-size:13px; cursor:pointer; border-radius:6px; margin-bottom:6px;';
-      btn.innerHTML = `${folderName} <span style="color:#00ff00; float:right;">(yükleniyor...)</span>`;
-      btn.addEventListener('click', () => loadVariantFolder(folderName));
+      btn.innerHTML = `<span class="folder-name">${folderName}</span><span class="folder-count">(yükleniyor...)</span>`;
       folderList.appendChild(btn);
       
       // Klasör sayısını sırayla al (await) - mobilde daha stabil
@@ -1153,13 +1226,13 @@ async function fetchVariantCount(folderName, btnElement){
     const list = await fetchVariantsByFolder(folderName);
     cacheVariantFolderData(folderName, list);
     const count = Array.isArray(list) ? list.length : 0;
-    const span = btnElement.querySelector('span');
+    const span = btnElement.querySelector('.folder-count');
     if (span) {
       span.textContent = `(${count} varyant)`;
       span.style.color = '#00ff00';
     }
   } catch(e) {
-    const span = btnElement.querySelector('span');
+    const span = btnElement.querySelector('.folder-count');
     if (span) {
       span.textContent = '(0 varyant)';
       span.style.color = '#00ff00';
@@ -1168,7 +1241,6 @@ async function fetchVariantCount(folderName, btnElement){
 }
 
 async function loadVariantFolder(folderName){
-  clearSearchFilmstrip(true);
   state.variantSubfolderFilter = null;
   state.viewMode = 'variant';
   
@@ -1405,6 +1477,21 @@ elements.searchInput?.addEventListener('input', async (e) => {
   }
 });
 
+elements.searchInput?.addEventListener('blur', () => {
+  const cleared = clearDesignSearchIfActive();
+  if (!cleared) return;
+  const isVariantActive = state.viewMode === 'variant' || elements.btnVaryantlar?.classList.contains('active');
+  const isDesignActive = !isVariantActive || elements.btnDesenler?.classList.contains('active');
+  if (isDesignActive) {
+    renderGallery();
+  }
+  if (isVariantActive) {
+    state.variantSearchSeq += 1;
+    state.variantSearchResults = [];
+    renderVariants(state.variants);
+  }
+});
+
 elements.shareBtn?.addEventListener('click', () => {
   shareGallery();
 });
@@ -1474,48 +1561,55 @@ elements.exitBtn?.addEventListener('click', () => {
   }
 });
 
-// Klasör listesi butonları
-const folderButtons = document.querySelectorAll('.folder-item');
-console.log(`${folderButtons.length} adet klasör butonu bulundu`);
-folderButtons.forEach((btn, index) => {
-  btn.addEventListener('click', async function() {
-    const folderName = this.dataset.folder;
-    console.log(`Klasör ${index + 1} tıklandı: ${folderName}`);
-    // Görsel highlight
-    folderButtons.forEach(b => b.classList.remove('active-folder'));
-    this.classList.add('active-folder');
-
-    // Eğer bu bir variant-folder-item ise: desen endpoint'lerini çağırma, varyant akışına yönlendir
-    if (this.classList.contains('variant-folder-item')) {
-      try {
-        state.variantSubfolderFilter = folderName;
-        await loadVariantFolder(folderName);
-      } catch (err) {
-        alert('Varyant klasörü yüklenemedi: ' + err);
-      }
-      return; // Variant akışını tamamladık
-    }
-
-    // Normal desen klasörü akışı
-    try {
-      // Tek ana önizleme için 1, gallery için ayrıca çağrı yapılacak
-      const params = new URLSearchParams({ take: '1', folder: folderName });
-      // Kategori artık kullanılmıyor
-      const resp = await fetch(`/archive/samples?${params.toString()}`, { cache: 'no-store' });
-      if (!resp.ok) throw new Error(await resp.text());
-      const list = await resp.json();
-      if (Array.isArray(list) && list.length) {
-        setMainPreviewFromItem(list[0]);
-        // Çoklu önizleme galerisi
-        loadFolderGallery(folderName);
-      } else {
-        alert(`${folderName} klasöründe desen bulunamadı.`);
-      }
-    } catch (err) {
-      alert('Klasör yüklenemedi: ' + err);
-    }
+function initFolderListHandler(){
+  const folderList = document.getElementById('folder-list');
+  if (!folderList || folderList.dataset.clickBound) return;
+  folderList.dataset.clickBound = 'true';
+  folderList.addEventListener('click', async evt => {
+    const btn = evt.target.closest('button[data-folder]');
+    if (!btn || !folderList.contains(btn)) return;
+    await handleFolderButtonClick(btn);
   });
-});
+}
+
+function highlightDesignFolderButton(folderName){
+  const designButtons = document.querySelectorAll('.folder-item:not(.variant-folder-item)');
+  designButtons.forEach(btn => btn.classList.remove('active-folder'));
+  if (!folderName) return;
+  const target = Array.from(designButtons).find(btn => btn.dataset.folder === folderName);
+  if (target) target.classList.add('active-folder');
+}
+
+async function handleFolderButtonClick(btn){
+  const folderName = btn.getAttribute('data-folder');
+  if (!folderName) return;
+  if (btn.classList.contains('variant-folder-item')) {
+    try {
+      state.variantSubfolderFilter = folderName;
+      await loadVariantFolder(folderName);
+    } catch (err) {
+      alert('Varyant klasörü yüklenemedi: ' + err);
+    }
+    return;
+  }
+
+  highlightDesignFolderButton(folderName);
+
+  try {
+    const params = new URLSearchParams({ take: '1', folder: folderName });
+    const resp = await fetch(`/archive/samples?${params.toString()}`, { cache: 'no-store' });
+    if (!resp.ok) throw new Error(await resp.text());
+    const list = await resp.json();
+    if (Array.isArray(list) && list.length) {
+      setMainPreviewFromItem(list[0]);
+      loadFolderGallery(folderName);
+    } else {
+      alert(`${folderName} klasöründe desen bulunamadı.`);
+    }
+  } catch (err) {
+    alert('Klasör yüklenemedi: ' + err);
+  }
+}
 
 function triggerSimilarSearch(source) {
   const input = source === 'camera' ? elements.cameraFileInput : elements.galleryFileInput;
@@ -1523,30 +1617,6 @@ function triggerSimilarSearch(source) {
   input.value = '';
   input.click();
 }
-
-function updateCapturePreview(file) {
-  const preview = elements.capturePreview;
-  const frame = elements.captureFrame;
-  if (!preview || !frame) return;
-  if (capturePreviewObjectUrl) {
-    URL.revokeObjectURL(capturePreviewObjectUrl);
-    capturePreviewObjectUrl = null;
-  }
-  if (!file) {
-    preview.removeAttribute('src');
-    preview.style.opacity = '0';
-    frame.style.background = captureFrameStyles.emptyBg;
-    frame.style.border = captureFrameStyles.emptyBorder;
-    return;
-  }
-  const url = URL.createObjectURL(file);
-  capturePreviewObjectUrl = url;
-  preview.src = url;
-  preview.style.opacity = '1';
-  frame.style.background = captureFrameStyles.filledBg;
-  frame.style.border = captureFrameStyles.filledBorder;
-}
-updateCapturePreview(null);
 
 // Galeri veya kamera ile dosya seçip yükle
 async function searchByFile(file) {
@@ -1558,13 +1628,21 @@ async function searchByFile(file) {
     if (!resp.ok) throw new Error(await resp.text());
     const json = await resp.json();
     const results = Array.isArray(json) ? json : (json.all_results || json.results || []);
-    state.results = Array.isArray(results) ? results : [];
-    renderResults('Resimden arama');
-    if (state.results.length) {
-      selectResult(0);
-    } else {
-      clearMatch();
+    state.results = results;
+    if (results.length) {
+      const best = results[0];
+      if (best.path) {
+        const token = encodePath(best.path);
+        if (elements.mainPreview) {
+          elements.mainPreview.src = `/archive/image?path=${encodeURIComponent(token)}&v=${Date.now()}`;
+        }
+        if (elements.mainTitle) {
+          const fn = best.path.split('\\').pop() || 'Eşleşme';
+          elements.mainTitle.textContent = `🖼️ Eşleşme · ${fn}`;
+        }
+      }
     }
+    renderArchivePreview();
   } catch (err) {
     alert('Benzer desen araması başarısız: ' + err);
   }
@@ -1592,12 +1670,7 @@ elements.sourceChoiceModal?.addEventListener('click', evt => {
 [elements.galleryFileInput, elements.cameraFileInput].forEach(input => {
   input?.addEventListener('change', async () => {
     const f = input.files?.[0];
-    if (f) {
-      updateCapturePreview(f);
-      await searchByFile(f);
-    } else {
-      updateCapturePreview(null);
-    }
+    if (f) await searchByFile(f);
     input.value = '';
   });
 });
@@ -1607,16 +1680,10 @@ function clearMatch() {
   if (elements.matchMeta) elements.matchMeta.textContent = '';
   if (elements.matchScore) elements.matchScore.textContent = '0%';
   elements.matchPreview?.removeAttribute?.('src');
-  clearSearchFilmstrip();
   renderArchivePreview();
 }
 
-function renderResults(contextLabel) {
-  if (typeof contextLabel === 'string') {
-    applySearchFilmstrip(state.results, contextLabel);
-  } else if (state.searchFilmstrip?.length) {
-    renderGallery();
-  }
+function renderResults() {
   if (!elements.resultList) {
     // Sonuç listesi DOM'da yoksa sadece küçük önizlemeyi güncelle
     renderArchivePreview();
@@ -1649,22 +1716,16 @@ function selectResult(index) {
   renderResults();
   const result = state.results[index];
   if (!result) return;
-  const displayName = result.fileName || result.path?.split('\\').pop() || 'Desen';
-  if (elements.matchLabel) elements.matchLabel.textContent = displayName;
+  if (elements.matchLabel) elements.matchLabel.textContent = result.path?.split('\\').pop() || 'Desen';
   if (elements.matchMeta) elements.matchMeta.textContent = result.path || '';
   if (elements.matchScore) elements.matchScore.textContent = `${Math.round((result.score || 0)*100)}%`;
-  const token = result.token || (result.path ? encodePath(result.path) : null);
-  if (token) {
-    setMainPreviewFromItem({
-      token,
-      fileName: displayName,
-      folder: result.folder || ''
-    });
-    if (elements.matchPreview) {
-      elements.matchPreview.src = `/archive/image?path=${encodeURIComponent(token)}&v=${Date.now()}`;
+  if (result.path) {
+    try {
+      const token = encodePath(result.path);
+      if (elements.matchPreview) elements.matchPreview.src = `/archive/image?path=${encodeURIComponent(token)}&v=${Date.now()}`;
+    } catch {
+      elements.matchPreview?.removeAttribute?.('src');
     }
-  } else {
-    elements.matchPreview?.removeAttribute?.('src');
   }
 }
 
@@ -1693,7 +1754,6 @@ function initLogoFromStorage() {
 
 async function loadArchiveSamples(showSpinner = false) {
   if (!elements.galleryGrid) return;
-  clearSearchFilmstrip(true);
   if (showSpinner) {
     elements.galleryGrid.innerHTML = '<div class="empty-state subtle">Arşiv yeniden taranıyor...</div>';
   }
@@ -1742,7 +1802,7 @@ async function loadCategoryPreview(category) {
 
 async function loadCategoryGallery(category) {
   try {
-    clearSearchFilmstrip(true);
+    const hadMainToken = !!state.mainToken;
     // Etiket görünümünden çıkıyoruz
     state.activeTag = null;
     if (elements.removeFromTagBtn) {
@@ -1756,10 +1816,16 @@ async function loadCategoryGallery(category) {
     if (!resp.ok) throw new Error(await resp.text());
     const list = await resp.json();
     state.gallery = Array.isArray(list) ? list : [];
+    const firstItem = state.gallery.find(item => item && item.token) || null;
+    if (firstItem) {
+      setMainPreviewFromItem(firstItem);
+      queuePreviewUpdate(firstItem);
+    } else {
+      queuePreviewUpdate(null, true);
+    }
     renderGallery();
     if (elements.galleryDescription) elements.galleryDescription.textContent = `Tüm Desenler · ${state.gallery.length} adet önizleme`;
-    if (!state.mainToken && state.gallery.length) {
-      setMainPreviewFromItem(state.gallery[0]);
+    if (!hadMainToken && state.mainToken) {
       autoLoadVariants();
     }
   } catch (err) {
@@ -1768,14 +1834,17 @@ async function loadCategoryGallery(category) {
 }
 
 async function loadFolderGallery(folder) {
+  if (!folder) return;
   try {
-    clearSearchFilmstrip(true);
+    const hadMainToken = !!state.mainToken;
     // Etiket görünümünden çıkıyoruz
     state.activeTag = null;
     if (elements.removeFromTagBtn) {
       elements.removeFromTagBtn.style.display = 'none';
     }
     state.viewMode = 'design';
+    state.currentFolder = folder;
+    highlightDesignFolderButton(folder);
     
     state.subfolderFilter = null;
     
@@ -1789,17 +1858,20 @@ async function loadFolderGallery(folder) {
     if (!resp.ok) throw new Error(await resp.text());
     const list = await resp.json();
     state.gallery = Array.isArray(list) ? list : [];
+    const firstItem = state.gallery.find(item => item && item.token) || null;
+    if (firstItem) {
+      setMainPreviewFromItem(firstItem);
+      queuePreviewUpdate(firstItem);
+    } else {
+      queuePreviewUpdate(null, true);
+    }
     renderGallery();
     if (elements.galleryDescription) elements.galleryDescription.textContent = `${folder} · ${state.gallery.length} adet önizleme`;
     // Alt klasörler listesi
     renderSubfoldersFromGallery();
-    if (state.gallery.length) {
-      const nextPrimary = state.gallery[0];
-      if (!state.mainToken || nextPrimary?.token !== state.mainToken) {
-        setMainPreviewFromItem(nextPrimary);
-      }
+    if (!hadMainToken && state.mainToken) {
+      autoLoadVariants();
     }
-    autoLoadVariants();
   } catch (err) {
     if (elements.galleryDescription) elements.galleryDescription.textContent = 'Klasör galerisi yüklenemedi';
   }
@@ -1820,6 +1892,7 @@ function setMainPreviewFromItem(item) {
       elements.mainPreview.onerror = () => console.error('Ana önizleme yüklenemedi:', elements.mainPreview.src);
       elements.mainPreview.onload = () => console.log('Ana önizleme yüklendi');
       state.mainToken = item.token || null;
+      highlightGalleryMainSelection();
     } else {
       console.warn('mainPreview veya token eksik:', { 
         hasMainPreview: !!elements.mainPreview, 
@@ -1841,10 +1914,6 @@ function setMainPreviewFromItem(item) {
 
 // Varyantlar
 async function loadVariants() {
-  if (state.searchFilmstrip?.length) {
-    console.log('🔴 Benzer arama film şeridi aktif, varyant yükleme atlandı.');
-    return;
-  }
   const strip = document.getElementById('variants-strip');
   const countEl = document.getElementById('variants-count');
   
@@ -1979,10 +2048,6 @@ async function performVariantSearch(query, skipSpinner){
 }
 
 function renderVariants(items) {
-  if (state.searchFilmstrip?.length) {
-    console.log('🔴 Benzer arama film şeridi aktif, varyantlar gösterilmiyor.');
-    return;
-  }
   // Varyantları çoklu önizleme galerisinde göster
   const strip = document.getElementById('gallery-grid');
   const descEl = document.getElementById('gallery-description');
@@ -2097,7 +2162,6 @@ function renderVariants(items) {
 }
 
 function autoLoadVariants(){
-  if (state.searchFilmstrip?.length) return;
   const strip = document.getElementById('variants-strip');
   if (!state.mainToken || !strip) return;
   if (strip.children.length === 0) {
@@ -2250,20 +2314,19 @@ document.addEventListener('keydown', e => {
   }
 });
 function navigateFullscreen(dir){
-  const source = (state.searchFilmstrip?.length ? state.searchFilmstrip : state.gallery) || [];
-  console.log('Navigate:', dir, 'Gallery length:', source.length, 'Main token:', state.mainToken);
-  if (!Array.isArray(source) || !source.length) {
+  console.log('Navigate:', dir, 'Gallery length:', state.gallery?.length, 'Main token:', state.mainToken);
+  if (!Array.isArray(state.gallery) || !state.gallery.length) {
     console.warn('Galeri boş veya yüklenmemiş');
     return;
   }
-  const idxCurrent = source.findIndex(x => x.token === state.mainToken);
+  const idxCurrent = state.gallery.findIndex(x => x.token === state.mainToken);
   console.log('Current index:', idxCurrent);
   if (idxCurrent === -1) {
     console.warn('Mevcut resim galeride bulunamadı');
     return;
   }
-  let next = (idxCurrent + dir + source.length) % source.length;
-  const item = source[next];
+  let next = (idxCurrent + dir + state.gallery.length) % state.gallery.length;
+  const item = state.gallery[next];
   console.log('Next item:', item);
   setMainPreviewFromItem(item);
   if (elements.fullscreenOverlay?.classList.contains('open') && elements.fullscreenImg) {
@@ -2272,94 +2335,55 @@ function navigateFullscreen(dir){
 }
 elements.fullscreenOverlay?.addEventListener('click', e => { if (e.target === elements.fullscreenOverlay) closeFullscreen(); });
 
-function clearSearchFilmstrip(silent = false) {
-  const hadStrip = Array.isArray(state.searchFilmstrip) && state.searchFilmstrip.length > 0;
-  state.searchFilmstrip = [];
-  state.searchContext = null;
-  state.selected = null;
-  if (hadStrip && !silent) {
-    renderGallery();
-    renderSubfoldersFromGallery();
-  }
-}
-
-function applySearchFilmstrip(results, contextLabel) {
-  if (!Array.isArray(results) || !results.length) {
-    clearSearchFilmstrip();
-    return;
-  }
-  state.searchFilmstrip = results
-    .filter(item => item && (item.token || item.path))
-    .map((result, index) => ({
-      token: result.token || (result.path ? encodePath(result.path) : null),
-      fileName: result.fileName || result.path?.split('\\').pop() || `Sonuç ${index + 1}`,
-      folder: result.folder || '',
-      score: typeof result.score === 'number' ? result.score : null,
-      path: result.path || '',
-      resultIndex: index
-    }))
-    .filter(item => !!item.token);
-  state.searchContext = (typeof contextLabel === 'string' && contextLabel.trim())
-    ? contextLabel.trim()
-    : (state.searchContext || 'Benzer arama');
-  renderGallery();
-  renderSubfoldersFromGallery();
-}
-
 function renderGallery() {
   if (!elements.galleryGrid) return;
-  const host = elements.galleryGrid;
-  const usingSearchStrip = Array.isArray(state.searchFilmstrip) && state.searchFilmstrip.length > 0;
-  host.classList.toggle('search-strip', usingSearchStrip);
-  host.innerHTML = '';
-  let items = usingSearchStrip
-    ? [...state.searchFilmstrip]
-    : (Array.isArray(state.gallery) ? [...state.gallery] : []);
+  elements.galleryGrid.innerHTML = '';
+  let items = Array.isArray(state.gallery) ? [...state.gallery] : [];
   
-  if (!usingSearchStrip) {
-    if (state.subfolderFilter) {
-      items = items.filter(x => (x.folder || '').toLowerCase() === state.subfolderFilter.toLowerCase());
-    }
-    const hasSearch = state.searchQuery && state.searchQuery.length >= 1;
-    const queryLower = hasSearch ? state.searchQuery.toLowerCase() : '';
-    if (hasSearch) {
-      const baseMatches = items.filter(item => matchesSearchQuery(item, queryLower));
-      const tagMatches = collectTagSearchMatches(queryLower);
-      const merged = new Map();
-      const addItem = entry => {
-        if (!entry) return;
-        const key = entry.token || `${entry.fileName || 'file'}-${entry.folder || 'folder'}-${entry.numara || ''}`;
-        if (!merged.has(key)) {
-          merged.set(key, entry);
-        }
-      };
-      baseMatches.forEach(addItem);
-      tagMatches.forEach(addItem);
-      items = Array.from(merged.values());
-      if (elements.galleryDescription) {
-        const label = items.length ? `${items.length} sonuç` : 'Sonuç bulunamadı';
-        elements.galleryDescription.textContent = `Arama · ${label}`;
+  // Alt klasör filtresi
+  if (state.subfolderFilter) {
+    items = items.filter(entry => resolveFolderName(entry).toLowerCase() === state.subfolderFilter.toLowerCase());
+  }
+
+  const hasSearch = state.searchQuery && state.searchQuery.length >= 1;
+  const queryLower = hasSearch ? state.searchQuery.toLowerCase() : '';
+
+  if (hasSearch) {
+    const baseMatches = items.filter(item => matchesSearchQuery(item, queryLower));
+    const tagMatches = collectTagSearchMatches(queryLower);
+    const merged = new Map();
+    const addItem = entry => {
+      if (!entry) return;
+      const key = entry.token || `${entry.fileName || 'file'}-${entry.folder || 'folder'}-${entry.numara || ''}`;
+      if (!merged.has(key)) {
+        merged.set(key, entry);
       }
+    };
+    baseMatches.forEach(addItem);
+    tagMatches.forEach(addItem);
+    items = Array.from(merged.values());
+    if (elements.galleryDescription) {
+      const label = items.length ? `${items.length} sonuç` : 'Sonuç bulunamadı';
+      elements.galleryDescription.textContent = `Arama · ${label}`;
     }
-  } else if (elements.galleryDescription) {
-    const label = state.searchContext || 'Benzer arama';
-    elements.galleryDescription.textContent = `${label} · ${items.length} sonuç`;
   }
   
   if (!items.length) {
-    const msg = usingSearchStrip
-      ? 'Benzerlik araması için sonuç bulunamadı.'
-      : (state.searchQuery ? `"${state.searchQuery}" için sonuç bulunamadı.` : 'Arşivde görüntülenecek desen bulunamadı.');
-    host.innerHTML = `<div class="empty-state subtle">${msg}</div>`;
+    const msg = state.searchQuery ? `"${state.searchQuery}" için sonuç bulunamadı.` : 'Arşivde görüntülenecek desen bulunamadı.';
+    elements.galleryGrid.innerHTML = `<div class="empty-state subtle">${msg}</div>`;
     return;
   }
 
+  applyPendingPreview(items);
+
   items.forEach(item => {
-    const isSelected = !usingSearchStrip && state.selectedDesigns.some(x => x.token === item.token);
+    const isSelected = state.selectedDesigns.some(x => x.token === item.token);
+    const isMainPreview = !!state.mainToken && item.token === state.mainToken;
+    
     const tile = document.createElement('div');
     tile.className = 'gallery-item';
-    if (usingSearchStrip && typeof item.resultIndex === 'number' && state.selected === item.resultIndex) {
-      tile.classList.add('active');
+    if (isMainPreview) {
+      tile.classList.add('selected-image');
     }
     tile.style.position = 'relative';
     tile.style.minWidth = '110px';
@@ -2367,32 +2391,32 @@ function renderGallery() {
     tile.style.cursor = 'pointer';
     tile.dataset.token = item.token;
     
-    if (!usingSearchStrip) {
-      const checkboxWrapper = document.createElement('div');
-      checkboxWrapper.style.position = 'absolute';
-      checkboxWrapper.style.top = '4px';
-      checkboxWrapper.style.left = '4px';
-      checkboxWrapper.style.zIndex = '10';
-      
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.className = 'design-checkbox';
-      checkbox.dataset.token = item.token;
-      checkbox.checked = isSelected;
-      checkbox.style.width = '20px';
-      checkbox.style.height = '20px';
-      checkbox.style.cursor = 'pointer';
-      checkbox.style.accentColor = '#007bff';
-      
-      checkbox.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleDesignSelection(item);
-      });
-      
-      checkboxWrapper.appendChild(checkbox);
-      tile.appendChild(checkboxWrapper);
-    }
+    // Checkbox
+    const checkboxWrapper = document.createElement('div');
+    checkboxWrapper.style.position = 'absolute';
+    checkboxWrapper.style.top = '4px';
+    checkboxWrapper.style.left = '4px';
+    checkboxWrapper.style.zIndex = '10';
     
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'design-checkbox';
+    checkbox.dataset.token = item.token;
+    checkbox.checked = isSelected;
+    checkbox.style.width = '20px';
+    checkbox.style.height = '20px';
+    checkbox.style.cursor = 'pointer';
+    checkbox.style.accentColor = '#007bff';
+    
+    checkbox.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleDesignSelection(item);
+    });
+    
+    checkboxWrapper.appendChild(checkbox);
+    tile.appendChild(checkboxWrapper);
+    
+    // Resim
     if (item.token) {
       const img = document.createElement('img');
       img.loading = 'lazy';
@@ -2402,18 +2426,20 @@ function renderGallery() {
       img.style.height = '100px';
       img.style.objectFit = 'cover';
       img.style.borderRadius = '4px';
-      img.style.border = !usingSearchStrip && isSelected ? '2px solid #007bff' : '1px solid #ddd';
-      img.style.boxShadow = !usingSearchStrip && isSelected ? '0 0 0 2px #007bff' : 'none';
+      if (isSelected) {
+        img.style.border = '2px solid #007bff';
+        img.style.boxShadow = '0 0 0 2px #007bff';
+      } else if (isMainPreview) {
+        img.style.border = '2px solid #e91e63';
+        img.style.boxShadow = '0 0 0 2px rgba(233,30,99,.4)';
+      } else {
+        img.style.border = '1px solid #ddd';
+        img.style.boxShadow = 'none';
+      }
       tile.appendChild(img);
     }
-
-    if (usingSearchStrip && typeof item.score === 'number') {
-      const badge = document.createElement('span');
-      badge.className = 'score-chip';
-      badge.textContent = `${Math.round((item.score || 0) * 100)}%`;
-      tile.appendChild(badge);
-    }
     
+    // Dosya adı
     const label = document.createElement('div');
     label.style.marginTop = '4px';
     label.style.fontSize = '11px';
@@ -2422,41 +2448,147 @@ function renderGallery() {
     label.style.whiteSpace = 'nowrap';
     label.style.overflow = 'hidden';
     label.style.textOverflow = 'ellipsis';
-    label.textContent = usingSearchStrip && typeof item.score === 'number'
-      ? `${item.fileName || 'Desen'} · ${Math.round((item.score || 0) * 100)}%`
-      : (item.fileName || 'Desen');
+    label.textContent = item.fileName || 'Desen';
     tile.appendChild(label);
     
-    tile.addEventListener('click', () => {
-      if (usingSearchStrip && typeof item.resultIndex === 'number') {
-        selectResult(item.resultIndex);
-        return;
-      }
-      setMainPreviewFromItem(item);
-    });
+    // Ana önizlemeye tıklama
+    tile.addEventListener('click', () => setMainPreviewFromItem(item));
     
-    host.appendChild(tile);
+    elements.galleryGrid.appendChild(tile);
   });
   
-  if (!usingSearchStrip) {
-    updateSelectionUI();
-  }
+  // Seçim UI'ını güncelle
+  updateSelectionUI();
   
+  // Film şeridi için sürükle-kaydır yeniden başlat
   initDragScroll();
+  highlightGalleryMainSelection();
+
+  if (state.viewMode === 'design' && !state.activeTag) {
+    renderSubfoldersFromGallery();
+  } else {
+    const host = document.getElementById('subfolders-list');
+    if (host) host.innerHTML = '';
+  }
+
+  if (state.activeTag) {
+    const hasMainInGallery = items.some(item => item && item.token === state.mainToken);
+    if (!hasMainInGallery) {
+      requestAnimationFrame(() => focusFirstGalleryItem());
+    }
+  }
+}
+
+function highlightGalleryMainSelection(){
+  const grid = document.getElementById('gallery-grid');
+  if (!grid) return;
+  const tiles = grid.querySelectorAll('.gallery-item');
+  tiles.forEach(tile => {
+    const isActive = !!state.mainToken && tile.dataset.token === state.mainToken;
+    tile.classList.toggle('selected-image', isActive);
+  });
+}
+
+function focusFirstGalleryItem(){
+  const grid = document.getElementById('gallery-grid');
+  if (!grid) return;
+  const firstTile = grid.querySelector('.gallery-item');
+  if (!firstTile) return;
+  const token = firstTile.dataset.token;
+  if (!token) return;
+  const candidate = (state.gallery || []).find(item => item && item.token === token);
+  if (candidate) {
+    setMainPreviewFromItem(candidate);
+  } else {
+    const fallbackItem = (state.gallery || []).find(item => item && item.token);
+    if (fallbackItem) {
+      setMainPreviewFromItem(fallbackItem);
+    } else {
+      firstTile.click();
+    }
+  }
+}
+
+function queuePreviewUpdate(item, fallbackToFirst = false) {
+  if (item && item.token) {
+    state.pendingPreviewToken = item.token;
+    state.pendingPreviewFallback = false;
+  } else if (fallbackToFirst) {
+    state.pendingPreviewToken = null;
+    state.pendingPreviewFallback = true;
+  }
+}
+
+function applyPendingPreview(items) {
+  const list = Array.isArray(items) ? items : [];
+  let applied = false;
+  if (state.pendingPreviewToken) {
+    const match = list.find(entry => entry && entry.token === state.pendingPreviewToken);
+    if (match) {
+      setMainPreviewFromItem(match);
+      applied = true;
+    }
+  }
+  const mainStillVisible = list.some(entry => entry && entry.token === state.mainToken);
+  const shouldFallback = state.pendingPreviewFallback || (!mainStillVisible && (state.activeTag || state.subfolderFilter));
+  if (!applied && shouldFallback && list.length) {
+    const firstValid = list.find(entry => entry && entry.token);
+    if (firstValid) {
+      setMainPreviewFromItem(firstValid);
+      applied = true;
+    }
+  }
+  if (applied) {
+    state.pendingPreviewToken = null;
+    state.pendingPreviewFallback = false;
+  }
+}
+
+function clearDesignSearchIfActive() {
+  if (!state.searchQuery) return false;
+  state.searchQuery = '';
+  if (elements.searchInput && elements.searchInput.value) {
+    elements.searchInput.value = '';
+  }
+  return true;
+}
+
+function resolveFolderName(entry) {
+  if (!entry || typeof entry !== 'object') return '';
+  const raw = entry.subfolder || entry.subFolder || entry.folder || '';
+  return typeof raw === 'string' ? raw.trim() : '';
 }
 
 function renderSubfoldersFromGallery(){
   const host = document.getElementById('subfolders-list');
   if (!host) return;
   host.innerHTML = '';
-  const items = Array.isArray(state.gallery) ? state.gallery : [];
-  const names = [...new Set(items.map(x => (x.folder||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
-  if (!names.length) return;
+  const entries = Array.isArray(state.gallery)
+    ? state.gallery.filter(entry => entry && (entry.token || resolveFolderName(entry)))
+    : [];
+  const names = [...new Set(entries.map(resolveFolderName).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,'tr'));
+  if (!names.length) {
+    highlightActiveSubfolder();
+    return;
+  }
   const clearBtn = document.createElement('button');
   clearBtn.type = 'button';
   clearBtn.className = 'pill';
   clearBtn.textContent = 'Tümü';
-  clearBtn.addEventListener('click', () => { state.subfolderFilter = null; renderGallery(); highlightActiveSubfolder(); });
+  clearBtn.addEventListener('click', () => {
+    state.subfolderFilter = null;
+    clearDesignSearchIfActive();
+    const firstItem = entries.find(item => item && item.token);
+    if (firstItem) {
+      setMainPreviewFromItem(firstItem);
+      queuePreviewUpdate(firstItem);
+    } else {
+      queuePreviewUpdate(null, true);
+    }
+    renderGallery();
+    highlightActiveSubfolder();
+  });
   host.appendChild(clearBtn);
   names.forEach(n => {
     const b = document.createElement('button');
@@ -2464,7 +2596,21 @@ function renderSubfoldersFromGallery(){
     b.className = 'pill';
     b.textContent = n;
     b.dataset.name = n;
-    b.addEventListener('click', () => { state.subfolderFilter = n; renderGallery(); highlightActiveSubfolder(); });
+    b.addEventListener('click', () => {
+      const normalized = n.trim();
+      state.subfolderFilter = normalized;
+      clearDesignSearchIfActive();
+      const filterName = normalized.toLowerCase();
+      const nextItem = entries.find(item => resolveFolderName(item).toLowerCase() === filterName);
+      if (nextItem) {
+        setMainPreviewFromItem(nextItem);
+        queuePreviewUpdate(nextItem);
+      } else {
+        queuePreviewUpdate(null, true);
+      }
+      renderGallery();
+      highlightActiveSubfolder();
+    });
     host.appendChild(b);
   });
   highlightActiveSubfolder();
@@ -2503,20 +2649,49 @@ function rebuildTagLookup(){
 
 // Etiket ekleme işlevi
 function renderTags() {
-  if (!elements.tagCombobox) return;
+  const combobox = elements.tagCombobox;
+  if (combobox) {
+    combobox.innerHTML = '<option value="">-- Etiket seçin --</option>';
+    state.tags.forEach(tag => {
+      const taggedCount = state.taggedDesigns[tag] ? state.taggedDesigns[tag].length : 0;
+      const option = document.createElement('option');
+      option.value = tag;
+      option.textContent = `${tag} ${taggedCount > 0 ? `(${taggedCount})` : ''}`;
+      combobox.appendChild(option);
+    });
+  }
+
+  const tagListHost = elements.tagList;
+  if (tagListHost) {
+    tagListHost.innerHTML = '';
+    if (!state.tags.length) {
+      tagListHost.style.display = 'none';
+    } else {
+      const frag = document.createDocumentFragment();
+      state.tags.forEach(tag => {
+        const count = state.taggedDesigns[tag] ? state.taggedDesigns[tag].length : 0;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'tag-pill';
+        btn.dataset.tag = tag;
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'tag-pill__label';
+        labelSpan.textContent = tag;
+        btn.appendChild(labelSpan);
+
+        const countSpan = document.createElement('span');
+        countSpan.className = 'tag-pill__count';
+        countSpan.textContent = count > 0 ? `${count}` : '0';
+        btn.appendChild(countSpan);
+
+        frag.appendChild(btn);
+      });
+      tagListHost.appendChild(frag);
+      tagListHost.style.display = 'flex';
+    }
+  }
   
-  // Combobox'ı güncelle
-  elements.tagCombobox.innerHTML = '<option value="">-- Etiket seçin --</option>';
-  
-  state.tags.forEach((tag) => {
-    const taggedCount = state.taggedDesigns[tag] ? state.taggedDesigns[tag].length : 0;
-    const option = document.createElement('option');
-    option.value = tag;
-    option.textContent = `${tag} ${taggedCount > 0 ? `(${taggedCount})` : ''}`;
-    elements.tagCombobox.appendChild(option);
-  });
-  
-  // İstatistikleri güncelle
   updateStatistics();
 }
 
@@ -2574,7 +2749,6 @@ function showTaggedDesigns(tag) {
   if (taggedItems.length === 0) {
     return;
   }
-  clearSearchFilmstrip(true);
   
   // Aktif etiketi kaydet
   state.activeTag = tag;
@@ -2584,6 +2758,15 @@ function showTaggedDesigns(tag) {
   state.gallery = taggedItems;
   state.subfolderFilter = null;
   state.searchQuery = ''; // Arama filtresini temizle, tüm etiketli desenleri göster
+  const firstTaggedItem = taggedItems.find(item => item && item.token);
+  if (firstTaggedItem) {
+    setMainPreviewFromItem(firstTaggedItem);
+    queuePreviewUpdate(firstTaggedItem);
+  } else {
+    state.mainToken = null;
+    queuePreviewUpdate(null, true);
+    highlightGalleryMainSelection();
+  }
   
   // Desenler tabına geç
   if (elements.btnVaryantlar?.classList.contains('active')) {
@@ -2602,10 +2785,11 @@ function showTaggedDesigns(tag) {
   }
   
   renderGallery();
-  if (taggedItems.length) {
-    setMainPreviewFromItem(taggedItems[0]);
-    autoLoadVariants();
-  }
+  requestAnimationFrame(() => {
+    if (!firstTaggedItem) {
+      focusFirstGalleryItem();
+    }
+  });
   updateStatistics();
 }
 
@@ -2632,6 +2816,19 @@ elements.tagCombobox?.addEventListener('change', (e) => {
   const selectedTag = e.target.value;
   if (selectedTag) {
     showTaggedDesigns(selectedTag);
+  }
+});
+
+// Tag listesi üzerinden tıklama ile etiket göster
+elements.tagList?.addEventListener('click', evt => {
+  const btn = evt.target.closest('button.tag-pill');
+  if (!btn || !elements.tagList.contains(btn)) return;
+  const tagName = btn.dataset.tag;
+  if (tagName) {
+    showTaggedDesigns(tagName);
+    if (elements.tagCombobox) {
+      elements.tagCombobox.value = tagName;
+    }
   }
 });
 
@@ -2663,7 +2860,12 @@ elements.tagDeleteBtn?.addEventListener('click', async () => {
         if (elements.removeFromTagBtn) {
           elements.removeFromTagBtn.style.display = 'none';
         }
-        loadFolderGallery(state.currentFolder || variantFolders[0]);
+        const fallbackFolder = state.currentFolder || state.designFolders?.[0] || null;
+        if (fallbackFolder) {
+          loadFolderGallery(fallbackFolder);
+        } else {
+          loadFolderList();
+        }
       }
     }
   }

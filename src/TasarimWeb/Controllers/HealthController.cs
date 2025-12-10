@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -6,6 +7,7 @@ namespace TasarimWeb.Controllers
 {
     [ApiController]
     [Route("healthz")]
+    [AllowAnonymous]
     public class HealthController : ControllerBase
     {
         private readonly IHttpClientFactory _httpClientFactory;

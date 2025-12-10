@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
 using System.Web;
@@ -6,6 +7,7 @@ namespace Tasarim.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class PdfController : ControllerBase
     {
         // Basit, kütüphanesiz, metin tabanlı minimal PDF üretimi.

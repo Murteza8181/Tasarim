@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using System.Text;
@@ -7,6 +8,7 @@ namespace TasarimWeb.Controllers
 {
     [ApiController]
     [Route("api/upload")]
+    [Authorize]
     public class UploadController : ControllerBase
     {
         private readonly IHttpClientFactory _httpClientFactory;
