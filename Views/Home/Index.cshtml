@@ -529,15 +529,20 @@
       .resizer { display: none !important; }
       .folder-item { min-height: 44px; font-size: 14px !important; }
       .pill { min-height: 36px; padding: 8px 14px; font-size: 13px; }
-      .gallery-grid { gap: 8px; }
-      .gallery-item { min-width: 90px; max-width: 90px; height: 115px; }
+      .gallery-grid { gap: 8px; min-height: 110px; padding: 4px 0; }
+      .gallery-item { min-width: 90px; max-width: 90px; height: 110px; }
+      .gallery-item .label { padding: 6px 8px; }
+      #right-panel { gap: 8px !important; }
+      #right-panel h2 { margin: 4px 0 8px; }
+      #right-panel h3 { margin-top: 12px; }
+      #similar-preview-card { padding: 10px; }
     }
     @@media (max-width: 520px) {
       body { padding: 8px; }
       .shell { gap: 12px; }
       .panel { padding: 12px; }
-      .gallery-grid { gap: 6px; }
-      .gallery-item { min-width: 80px; max-width: 80px; height: 100px; }
+      .gallery-grid { gap: 6px; min-height: 95px; padding: 2px 0; }
+      .gallery-item { min-width: 80px; max-width: 80px; height: 95px; }
       .panel h2 { font-size: 0.9rem; }
       button { min-height: 48px; font-size: 15px; }
       .folder-item { font-size: 13px !important; padding: 12px !important; }
