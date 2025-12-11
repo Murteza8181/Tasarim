@@ -233,8 +233,27 @@
       background: #020617;
       border: 1px solid rgba(148,163,184,.25);
       overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
     }
-    .preview-window img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .preview-window img {
+      width: 100%;
+      height: auto;
+      max-height: min(60vh, 520px);
+      object-fit: contain;
+      display: block;
+    }
+    @@media (max-width: 768px) {
+      #center-panel .preview-window {
+        min-height: 0;
+        padding: 8px;
+      }
+      .preview-window img {
+        max-height: min(65vh, 420px);
+      }
+    }
     /* Tam ekran görüntüleme overlay */
     .fullscreen-overlay { position:fixed; inset:0; background:#000; display:none; z-index:10000; align-items:center; justify-content:center; }
     .fullscreen-overlay.open { display:flex; }
@@ -430,7 +449,8 @@
     }
     .logo-card input { display: none; }
     .logo-card img { max-width: 240px; height: auto; margin: 0 auto; }
-    .choice-dialog {
+    .choice-dialog,
+    .camera-dialog {
       position: fixed;
       inset: 0;
       background: rgba(2,6,23,.8);
@@ -441,7 +461,8 @@
       z-index: 15;
       padding: 20px;
     }
-    .choice-dialog.open { display: flex; }
+    .choice-dialog.open,
+    .camera-dialog.open { display: flex; }
     .choice-card {
       width: min(360px, 100%);
       display: flex;
@@ -451,6 +472,26 @@
     }
     .choice-card p { margin: 0; color: var(--text-muted); font-size: .9rem; }
     .choice-card .actions { display: flex; flex-direction: column; gap: 10px; }
+    .camera-card {
+      width: min(540px, 100%);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .camera-card video {
+      width: 100%;
+      max-height: 360px;
+      border-radius: 18px;
+      border: 1px solid rgba(148,163,184,.35);
+      background: #000;
+      object-fit: cover;
+    }
+    .camera-card .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .camera-card .actions button { flex: 1; min-width: 140px; }
 
     @@media (max-width: 768px) {
       body { padding: 12px; }
@@ -543,6 +584,20 @@
         <button type="button" class="primary" id="choice-gallery-btn">📁 Galeriden Seç</button>
         <button type="button" class="ghost" id="choice-camera-btn">📷 Kameradan Çek</button>
         <button type="button" class="ghost" id="choice-cancel-btn" style="opacity:.7;">İptal</button>
+      </div>
+    </div>
+  </div>
+  <div class="camera-dialog" id="camera-modal">
+    <div class="panel camera-card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="margin:0;">Web Kamerası</h2>
+        <button type="button" class="ghost" id="camera-close-btn" style="width:auto; min-width:100px;">Kapat</button>
+      </div>
+      <video id="camera-stream" autoplay playsinline muted></video>
+      <canvas id="camera-canvas" style="display:none;"></canvas>
+      <div class="actions">
+        <button type="button" class="primary" id="camera-capture-btn">📸 Fotoğrafı Kullan</button>
+        <button type="button" class="ghost" id="camera-flip-btn">🔄 Kamerayı Değiştir</button>
       </div>
     </div>
   </div>
@@ -795,6 +850,8 @@ const state = {
 };
 // Element referanslarını lazy olarak al (DOM hazır olduğunda)
 const elements = {};
+let cameraStreamHandle = null;
+let cameraFacingMode = 'environment';
 function getElements() {
   if (elements._initialized) return elements;
   Object.assign(elements, {
@@ -822,6 +879,12 @@ function getElements() {
     sourceGalleryBtn: document.getElementById('choice-gallery-btn'),
     sourceCameraBtn: document.getElementById('choice-camera-btn'),
     sourceCancelBtn: document.getElementById('choice-cancel-btn'),
+    cameraModal: document.getElementById('camera-modal'),
+    cameraStream: document.getElementById('camera-stream'),
+    cameraCanvas: document.getElementById('camera-canvas'),
+    cameraCaptureBtn: document.getElementById('camera-capture-btn'),
+    cameraCloseBtn: document.getElementById('camera-close-btn'),
+    cameraFlipBtn: document.getElementById('camera-flip-btn'),
     mainPreview: document.getElementById('main-preview'),
     mainTitle: document.getElementById('main-title'),
     btnDesenler: document.getElementById('btn-desenler'),
@@ -922,6 +985,74 @@ function toggleSourceChoice(forceOpen) {
     ? forceOpen
     : !elements.sourceChoiceModal.classList.contains('open');
   elements.sourceChoiceModal.classList.toggle('open', shouldOpen);
+}
+
+const supportsWebCamera = () => !!(navigator?.mediaDevices?.getUserMedia);
+
+async function openCameraModal() {
+  if (!supportsWebCamera()) {
+    triggerSimilarSearch('camera');
+    return;
+  }
+  try {
+    cameraStreamHandle = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFacingMode }, audio: false });
+    if (elements.cameraStream) {
+      elements.cameraStream.srcObject = cameraStreamHandle;
+      await elements.cameraStream.play().catch(() => {});
+    }
+    elements.cameraModal?.classList.add('open');
+  } catch (err) {
+    console.warn('Kamera açılamadı:', err);
+    alert('Kameraya erişilemedi. Lütfen izinleri kontrol edin veya dosya seçimini kullanın.');
+    closeCameraModal(true);
+    triggerSimilarSearch('camera');
+  }
+}
+
+function stopCameraStream() {
+  if (cameraStreamHandle) {
+    cameraStreamHandle.getTracks().forEach(track => track.stop());
+    cameraStreamHandle = null;
+  }
+  if (elements.cameraStream) {
+    elements.cameraStream.srcObject = null;
+  }
+}
+
+function closeCameraModal(forceStop = false) {
+  elements.cameraModal?.classList.remove('open');
+  if (forceStop) {
+    stopCameraStream();
+  }
+}
+
+async function restartCameraStream() {
+  stopCameraStream();
+  await openCameraModal();
+}
+
+async function captureCameraFrame() {
+  if (!elements.cameraStream || !elements.cameraCanvas || !elements.cameraStream.srcObject) {
+    alert('Kamera hazır değil.');
+    return;
+  }
+  const video = elements.cameraStream;
+  const canvas = elements.cameraCanvas;
+  const ctx = canvas.getContext('2d');
+  const width = video.videoWidth || 640;
+  const height = video.videoHeight || 480;
+  canvas.width = width;
+  canvas.height = height;
+  ctx.drawImage(video, 0, 0, width, height);
+  canvas.toBlob(async blob => {
+    if (!blob) {
+      alert('Fotoğraf oluşturulamadı.');
+      return;
+    }
+    const file = new File([blob], `kamera_${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
+    await searchByFile(file);
+  }, 'image/jpeg', 0.92);
+  closeCameraModal(true);
 }
 
 async function pingPython() {
@@ -1629,20 +1760,55 @@ async function searchByFile(file) {
     const json = await resp.json();
     const results = Array.isArray(json) ? json : (json.all_results || json.results || []);
     state.results = results;
-    if (results.length) {
-      const best = results[0];
-      if (best.path) {
-        const token = encodePath(best.path);
-        if (elements.mainPreview) {
-          elements.mainPreview.src = `/archive/image?path=${encodeURIComponent(token)}&v=${Date.now()}`;
-        }
-        if (elements.mainTitle) {
-          const fn = best.path.split('\\').pop() || 'Eşleşme';
-          elements.mainTitle.textContent = `🖼️ Eşleşme · ${fn}`;
-        }
+
+    const galleryMatches = results
+      .map((result, index) => {
+        if (!result?.path) return null;
+        const token = encodePath(result.path);
+        const parts = result.path.split(/[\\/]+/).filter(Boolean);
+        const fileName = parts.pop() || `Eşleşme ${index + 1}`;
+        const folder = parts.pop() || '';
+        return {
+          token,
+          fileName,
+          folder,
+          path: result.path,
+          score: result.score ?? null,
+          source: 'similar-search'
+        };
+      })
+      .filter(Boolean);
+
+    state.gallery = galleryMatches;
+    state.viewMode = 'design';
+    state.activeTag = null;
+    state.subfolderFilter = null;
+    state.currentFolder = null;
+    state.searchQuery = '';
+    state.selectedDesigns = [];
+    state.selected = galleryMatches.length ? 0 : null;
+
+    if (elements.galleryDescription) {
+      elements.galleryDescription.textContent = galleryMatches.length
+        ? `Benzer arama · ${galleryMatches.length} sonuç`
+        : 'Benzer arama · eşleşme bulunamadı';
+    }
+
+    if (galleryMatches.length) {
+      const firstMatch = galleryMatches[0];
+      setMainPreviewFromItem(firstMatch);
+      if (typeof queuePreviewUpdate === 'function') {
+        queuePreviewUpdate(firstMatch);
+      }
+    } else {
+      state.mainToken = null;
+      if (typeof queuePreviewUpdate === 'function') {
+        queuePreviewUpdate(null, true);
       }
     }
-    renderArchivePreview();
+
+    renderGallery();
+    renderResults();
   } catch (err) {
     alert('Benzer desen araması başarısız: ' + err);
   }
@@ -1656,15 +1822,32 @@ elements.sourceGalleryBtn?.addEventListener('click', () => {
   triggerSimilarSearch('gallery');
 });
 
-elements.sourceCameraBtn?.addEventListener('click', () => {
+elements.sourceCameraBtn?.addEventListener('click', async () => {
   toggleSourceChoice(false);
-  triggerSimilarSearch('camera');
+  if (supportsWebCamera()) {
+    await openCameraModal();
+  } else {
+    triggerSimilarSearch('camera');
+  }
 });
 
 elements.sourceCancelBtn?.addEventListener('click', () => toggleSourceChoice(false));
 
 elements.sourceChoiceModal?.addEventListener('click', evt => {
   if (evt.target === elements.sourceChoiceModal) toggleSourceChoice(false);
+});
+
+elements.cameraModal?.addEventListener('click', evt => {
+  if (evt.target === elements.cameraModal) {
+    closeCameraModal(true);
+  }
+});
+
+elements.cameraCloseBtn?.addEventListener('click', () => closeCameraModal(true));
+elements.cameraCaptureBtn?.addEventListener('click', captureCameraFrame);
+elements.cameraFlipBtn?.addEventListener('click', async () => {
+  cameraFacingMode = cameraFacingMode === 'environment' ? 'user' : 'environment';
+  await restartCameraStream();
 });
 
 [elements.galleryFileInput, elements.cameraFileInput].forEach(input => {

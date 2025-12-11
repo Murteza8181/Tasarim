@@ -233,8 +233,27 @@
       background: #020617;
       border: 1px solid rgba(148,163,184,.25);
       overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
     }
-    .preview-window img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .preview-window img {
+      width: 100%;
+      height: auto;
+      max-height: min(60vh, 520px);
+      object-fit: contain;
+      display: block;
+    }
+    @@media (max-width: 768px) {
+      #center-panel .preview-window {
+        min-height: 0;
+        padding: 8px;
+      }
+      .preview-window img {
+        max-height: min(65vh, 420px);
+      }
+    }
     /* Tam ekran görüntüleme overlay */
     .fullscreen-overlay { position:fixed; inset:0; background:#000; display:none; z-index:10000; align-items:center; justify-content:center; }
     .fullscreen-overlay.open { display:flex; }
@@ -430,7 +449,8 @@
     }
     .logo-card input { display: none; }
     .logo-card img { max-width: 240px; height: auto; margin: 0 auto; }
-    .choice-dialog {
+    .choice-dialog,
+    .camera-dialog {
       position: fixed;
       inset: 0;
       background: rgba(2,6,23,.8);
@@ -441,7 +461,8 @@
       z-index: 15;
       padding: 20px;
     }
-    .choice-dialog.open { display: flex; }
+    .choice-dialog.open,
+    .camera-dialog.open { display: flex; }
     .choice-card {
       width: min(360px, 100%);
       display: flex;
@@ -451,6 +472,26 @@
     }
     .choice-card p { margin: 0; color: var(--text-muted); font-size: .9rem; }
     .choice-card .actions { display: flex; flex-direction: column; gap: 10px; }
+    .camera-card {
+      width: min(540px, 100%);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .camera-card video {
+      width: 100%;
+      max-height: 360px;
+      border-radius: 18px;
+      border: 1px solid rgba(148,163,184,.35);
+      background: #000;
+      object-fit: cover;
+    }
+    .camera-card .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .camera-card .actions button { flex: 1; min-width: 140px; }
 
     @@media (max-width: 768px) {
       body { padding: 12px; }
@@ -543,6 +584,20 @@
         <button type="button" class="primary" id="choice-gallery-btn">📁 Galeriden Seç</button>
         <button type="button" class="ghost" id="choice-camera-btn">📷 Kameradan Çek</button>
         <button type="button" class="ghost" id="choice-cancel-btn" style="opacity:.7;">İptal</button>
+      </div>
+    </div>
+  </div>
+  <div class="camera-dialog" id="camera-modal">
+    <div class="panel camera-card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="margin:0;">Web Kamerası</h2>
+        <button type="button" class="ghost" id="camera-close-btn" style="width:auto; min-width:100px;">Kapat</button>
+      </div>
+      <video id="camera-stream" autoplay playsinline muted></video>
+      <canvas id="camera-canvas" style="display:none;"></canvas>
+      <div class="actions">
+        <button type="button" class="primary" id="camera-capture-btn">📸 Fotoğrafı Kullan</button>
+        <button type="button" class="ghost" id="camera-flip-btn">🔄 Kamerayı Değiştir</button>
       </div>
     </div>
   </div>
@@ -789,10 +844,14 @@ const state = {
   searchQuery: '', // Arama query'si
   selectedDesigns: [], // Seçili desenler: {token, fileName, folder, numara}
   selectedVariants: [], // Seçili varyantlar
-  tagLookup: {} // Token -> etiket listesi
+  tagLookup: {}, // Token -> etiket listesi
+  pendingPreviewToken: null,
+  pendingPreviewFallback: false
 };
 // Element referanslarını lazy olarak al (DOM hazır olduğunda)
 const elements = {};
+let cameraStreamHandle = null;
+let cameraFacingMode = 'environment';
 function getElements() {
   if (elements._initialized) return elements;
   Object.assign(elements, {
@@ -820,6 +879,12 @@ function getElements() {
     sourceGalleryBtn: document.getElementById('choice-gallery-btn'),
     sourceCameraBtn: document.getElementById('choice-camera-btn'),
     sourceCancelBtn: document.getElementById('choice-cancel-btn'),
+    cameraModal: document.getElementById('camera-modal'),
+    cameraStream: document.getElementById('camera-stream'),
+    cameraCanvas: document.getElementById('camera-canvas'),
+    cameraCaptureBtn: document.getElementById('camera-capture-btn'),
+    cameraCloseBtn: document.getElementById('camera-close-btn'),
+    cameraFlipBtn: document.getElementById('camera-flip-btn'),
     mainPreview: document.getElementById('main-preview'),
     mainTitle: document.getElementById('main-title'),
     btnDesenler: document.getElementById('btn-desenler'),
@@ -920,6 +985,74 @@ function toggleSourceChoice(forceOpen) {
     ? forceOpen
     : !elements.sourceChoiceModal.classList.contains('open');
   elements.sourceChoiceModal.classList.toggle('open', shouldOpen);
+}
+
+const supportsWebCamera = () => !!(navigator?.mediaDevices?.getUserMedia);
+
+async function openCameraModal() {
+  if (!supportsWebCamera()) {
+    triggerSimilarSearch('camera');
+    return;
+  }
+  try {
+    cameraStreamHandle = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFacingMode }, audio: false });
+    if (elements.cameraStream) {
+      elements.cameraStream.srcObject = cameraStreamHandle;
+      await elements.cameraStream.play().catch(() => {});
+    }
+    elements.cameraModal?.classList.add('open');
+  } catch (err) {
+    console.warn('Kamera açılamadı:', err);
+    alert('Kameraya erişilemedi. Lütfen izinleri kontrol edin veya dosya seçimini kullanın.');
+    closeCameraModal(true);
+    triggerSimilarSearch('camera');
+  }
+}
+
+function stopCameraStream() {
+  if (cameraStreamHandle) {
+    cameraStreamHandle.getTracks().forEach(track => track.stop());
+    cameraStreamHandle = null;
+  }
+  if (elements.cameraStream) {
+    elements.cameraStream.srcObject = null;
+  }
+}
+
+function closeCameraModal(forceStop = false) {
+  elements.cameraModal?.classList.remove('open');
+  if (forceStop) {
+    stopCameraStream();
+  }
+}
+
+async function restartCameraStream() {
+  stopCameraStream();
+  await openCameraModal();
+}
+
+async function captureCameraFrame() {
+  if (!elements.cameraStream || !elements.cameraCanvas || !elements.cameraStream.srcObject) {
+    alert('Kamera hazır değil.');
+    return;
+  }
+  const video = elements.cameraStream;
+  const canvas = elements.cameraCanvas;
+  const ctx = canvas.getContext('2d');
+  const width = video.videoWidth || 640;
+  const height = video.videoHeight || 480;
+  canvas.width = width;
+  canvas.height = height;
+  ctx.drawImage(video, 0, 0, width, height);
+  canvas.toBlob(async blob => {
+    if (!blob) {
+      alert('Fotoğraf oluşturulamadı.');
+      return;
+    }
+    const file = new File([blob], `kamera_${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
+    await searchByFile(file);
+  }, 'image/jpeg', 0.92);
+  closeCameraModal(true);
 }
 
 async function pingPython() {
@@ -1627,20 +1760,55 @@ async function searchByFile(file) {
     const json = await resp.json();
     const results = Array.isArray(json) ? json : (json.all_results || json.results || []);
     state.results = results;
-    if (results.length) {
-      const best = results[0];
-      if (best.path) {
-        const token = encodePath(best.path);
-        if (elements.mainPreview) {
-          elements.mainPreview.src = `/archive/image?path=${encodeURIComponent(token)}&v=${Date.now()}`;
-        }
-        if (elements.mainTitle) {
-          const fn = best.path.split('\\').pop() || 'Eşleşme';
-          elements.mainTitle.textContent = `🖼️ Eşleşme · ${fn}`;
-        }
+
+    const galleryMatches = results
+      .map((result, index) => {
+        if (!result?.path) return null;
+        const token = encodePath(result.path);
+        const parts = result.path.split(/[\\/]+/).filter(Boolean);
+        const fileName = parts.pop() || `Eşleşme ${index + 1}`;
+        const folder = parts.pop() || '';
+        return {
+          token,
+          fileName,
+          folder,
+          path: result.path,
+          score: result.score ?? null,
+          source: 'similar-search'
+        };
+      })
+      .filter(Boolean);
+
+    state.gallery = galleryMatches;
+    state.viewMode = 'design';
+    state.activeTag = null;
+    state.subfolderFilter = null;
+    state.currentFolder = null;
+    state.searchQuery = '';
+    state.selectedDesigns = [];
+    state.selected = galleryMatches.length ? 0 : null;
+
+    if (elements.galleryDescription) {
+      elements.galleryDescription.textContent = galleryMatches.length
+        ? `Benzer arama · ${galleryMatches.length} sonuç`
+        : 'Benzer arama · eşleşme bulunamadı';
+    }
+
+    if (galleryMatches.length) {
+      const firstMatch = galleryMatches[0];
+      setMainPreviewFromItem(firstMatch);
+      if (typeof queuePreviewUpdate === 'function') {
+        queuePreviewUpdate(firstMatch);
+      }
+    } else {
+      state.mainToken = null;
+      if (typeof queuePreviewUpdate === 'function') {
+        queuePreviewUpdate(null, true);
       }
     }
-    renderArchivePreview();
+
+    renderGallery();
+    renderResults();
   } catch (err) {
     alert('Benzer desen araması başarısız: ' + err);
   }
@@ -1654,15 +1822,32 @@ elements.sourceGalleryBtn?.addEventListener('click', () => {
   triggerSimilarSearch('gallery');
 });
 
-elements.sourceCameraBtn?.addEventListener('click', () => {
+elements.sourceCameraBtn?.addEventListener('click', async () => {
   toggleSourceChoice(false);
-  triggerSimilarSearch('camera');
+  if (supportsWebCamera()) {
+    await openCameraModal();
+  } else {
+    triggerSimilarSearch('camera');
+  }
 });
 
 elements.sourceCancelBtn?.addEventListener('click', () => toggleSourceChoice(false));
 
 elements.sourceChoiceModal?.addEventListener('click', evt => {
   if (evt.target === elements.sourceChoiceModal) toggleSourceChoice(false);
+});
+
+elements.cameraModal?.addEventListener('click', evt => {
+  if (evt.target === elements.cameraModal) {
+    closeCameraModal(true);
+  }
+});
+
+elements.cameraCloseBtn?.addEventListener('click', () => closeCameraModal(true));
+elements.cameraCaptureBtn?.addEventListener('click', captureCameraFrame);
+elements.cameraFlipBtn?.addEventListener('click', async () => {
+  cameraFacingMode = cameraFacingMode === 'environment' ? 'user' : 'environment';
+  await restartCameraStream();
 });
 
 [elements.galleryFileInput, elements.cameraFileInput].forEach(input => {
@@ -2336,7 +2521,7 @@ function renderGallery() {
   if (!elements.galleryGrid) return;
   elements.galleryGrid.innerHTML = '';
   let items = Array.isArray(state.gallery) ? [...state.gallery] : [];
-  
+
   // Alt klasör filtresi
   if (state.subfolderFilter) {
     items = items.filter(entry => resolveFolderName(entry).toLowerCase() === state.subfolderFilter.toLowerCase());
@@ -2364,16 +2549,18 @@ function renderGallery() {
       elements.galleryDescription.textContent = `Arama · ${label}`;
     }
   }
-  
+
   if (!items.length) {
     const msg = state.searchQuery ? `"${state.searchQuery}" için sonuç bulunamadı.` : 'Arşivde görüntülenecek desen bulunamadı.';
     elements.galleryGrid.innerHTML = `<div class="empty-state subtle">${msg}</div>`;
+    highlightGalleryMainSelection();
     return;
   }
 
   items.forEach(item => {
     const isSelected = state.selectedDesigns.some(x => x.token === item.token);
-    
+    const isMainPreview = state.mainToken && state.mainToken === item.token;
+
     const tile = document.createElement('div');
     tile.className = 'gallery-item';
     tile.style.position = 'relative';
@@ -2381,14 +2568,14 @@ function renderGallery() {
     tile.style.flexShrink = '0';
     tile.style.cursor = 'pointer';
     tile.dataset.token = item.token;
-    
+
     // Checkbox
     const checkboxWrapper = document.createElement('div');
     checkboxWrapper.style.position = 'absolute';
     checkboxWrapper.style.top = '4px';
     checkboxWrapper.style.left = '4px';
     checkboxWrapper.style.zIndex = '10';
-    
+
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.className = 'design-checkbox';
@@ -2398,15 +2585,15 @@ function renderGallery() {
     checkbox.style.height = '20px';
     checkbox.style.cursor = 'pointer';
     checkbox.style.accentColor = '#007bff';
-    
+
     checkbox.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleDesignSelection(item);
     });
-    
+
     checkboxWrapper.appendChild(checkbox);
     tile.appendChild(checkboxWrapper);
-    
+
     // Resim
     if (item.token) {
       const img = document.createElement('img');
@@ -2417,11 +2604,19 @@ function renderGallery() {
       img.style.height = '100px';
       img.style.objectFit = 'cover';
       img.style.borderRadius = '4px';
-      img.style.border = isSelected ? '2px solid #007bff' : '1px solid #ddd';
-      img.style.boxShadow = isSelected ? '0 0 0 2px #007bff' : 'none';
+      if (isSelected) {
+        img.style.border = '2px solid #007bff';
+        img.style.boxShadow = '0 0 0 2px #007bff';
+      } else if (isMainPreview) {
+        img.style.border = '2px solid #e91e63';
+        img.style.boxShadow = '0 0 0 2px rgba(233,30,99,.4)';
+      } else {
+        img.style.border = '1px solid #ddd';
+        img.style.boxShadow = 'none';
+      }
       tile.appendChild(img);
     }
-    
+
     // Dosya adı
     const label = document.createElement('div');
     label.style.marginTop = '4px';
@@ -2433,23 +2628,97 @@ function renderGallery() {
     label.style.textOverflow = 'ellipsis';
     label.textContent = item.fileName || 'Desen';
     tile.appendChild(label);
-    
+
     // Ana önizlemeye tıklama
     tile.addEventListener('click', () => setMainPreviewFromItem(item));
-    
+
     elements.galleryGrid.appendChild(tile);
   });
-  
+
   // Seçim UI'ını güncelle
   updateSelectionUI();
-  
+
   // Film şeridi için sürükle-kaydır yeniden başlat
   initDragScroll();
+  highlightGalleryMainSelection();
+
   if (state.viewMode === 'design' && !state.activeTag) {
     renderSubfoldersFromGallery();
   } else {
     const host = document.getElementById('subfolders-list');
     if (host) host.innerHTML = '';
+  }
+
+  if (state.activeTag) {
+    const hasMainInGallery = items.some(item => item && item.token === state.mainToken);
+    if (!hasMainInGallery) {
+      requestAnimationFrame(() => focusFirstGalleryItem());
+    }
+  }
+}
+
+function highlightGalleryMainSelection(){
+  const grid = document.getElementById('gallery-grid');
+  if (!grid) return;
+  const tiles = grid.querySelectorAll('.gallery-item');
+  tiles.forEach(tile => {
+    const isActive = !!state.mainToken && tile.dataset.token === state.mainToken;
+    tile.classList.toggle('selected-image', isActive);
+  });
+}
+
+function focusFirstGalleryItem(){
+  const grid = document.getElementById('gallery-grid');
+  if (!grid) return;
+  const firstTile = grid.querySelector('.gallery-item');
+  if (!firstTile) return;
+  const token = firstTile.dataset.token;
+  if (!token) return;
+  const candidate = (state.gallery || []).find(item => item && item.token === token);
+  if (candidate) {
+    setMainPreviewFromItem(candidate);
+  } else {
+    const fallbackItem = (state.gallery || []).find(item => item && item.token);
+    if (fallbackItem) {
+      setMainPreviewFromItem(fallbackItem);
+    } else {
+      firstTile.click();
+    }
+  }
+}
+
+function queuePreviewUpdate(item, fallbackToFirst = false) {
+  if (item && item.token) {
+    state.pendingPreviewToken = item.token;
+    state.pendingPreviewFallback = false;
+  } else if (fallbackToFirst) {
+    state.pendingPreviewToken = null;
+    state.pendingPreviewFallback = true;
+  }
+}
+
+function applyPendingPreview(items) {
+  const list = Array.isArray(items) ? items : [];
+  let applied = false;
+  if (state.pendingPreviewToken) {
+    const match = list.find(entry => entry && entry.token === state.pendingPreviewToken);
+    if (match) {
+      setMainPreviewFromItem(match);
+      applied = true;
+    }
+  }
+  const mainStillVisible = list.some(entry => entry && entry.token === state.mainToken);
+  const shouldFallback = state.pendingPreviewFallback || (!mainStillVisible && (state.activeTag || state.subfolderFilter));
+  if (!applied && shouldFallback && list.length) {
+    const firstValid = list.find(entry => entry && entry.token);
+    if (firstValid) {
+      setMainPreviewFromItem(firstValid);
+      applied = true;
+    }
+  }
+  if (applied) {
+    state.pendingPreviewToken = null;
+    state.pendingPreviewFallback = false;
   }
 }
 
@@ -2488,6 +2757,13 @@ function renderSubfoldersFromGallery(){
   clearBtn.addEventListener('click', () => {
     state.subfolderFilter = null;
     clearDesignSearchIfActive();
+    const firstItem = entries.find(item => item && item.token);
+    if (firstItem) {
+      setMainPreviewFromItem(firstItem);
+      queuePreviewUpdate(firstItem);
+    } else {
+      queuePreviewUpdate(null, true);
+    }
     renderGallery();
     highlightActiveSubfolder();
   });
@@ -2502,6 +2778,14 @@ function renderSubfoldersFromGallery(){
       const normalized = n.trim();
       state.subfolderFilter = normalized;
       clearDesignSearchIfActive();
+      const filterName = normalized.toLowerCase();
+      const nextItem = entries.find(item => resolveFolderName(item).toLowerCase() === filterName);
+      if (nextItem) {
+        setMainPreviewFromItem(nextItem);
+        queuePreviewUpdate(nextItem);
+      } else {
+        queuePreviewUpdate(null, true);
+      }
       renderGallery();
       highlightActiveSubfolder();
     });
