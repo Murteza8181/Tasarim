@@ -712,6 +712,12 @@
       <button class="primary" type="button" id="similar-search-btn" style="width:100%; min-height:54px; font-size:15px; margin-bottom:20px; white-space:normal; line-height:1.4;">🔍 Benzer Desen Arama</button>
       <input id="gallery-file-input" type="file" accept="image/*" style="display:none;" />
       <input id="camera-file-input" type="file" accept="image/*" capture="environment" style="display:none;" />
+      <div id="similar-preview-card" style="background:rgba(15,23,42,0.65); border:1px solid rgba(148,163,184,.25); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:10px;">
+        <div style="font-weight:600; color:#e2e8f0; font-size:14px;">🎯 Benzer Arama Önizleme</div>
+        <div id="similar-preview-empty" class="empty-state subtle" style="margin:6px 0; font-size:13px; color:#94a3b8;">Henüz görsel seçilmedi.</div>
+        <img id="similar-preview-img" alt="Benzer arama önizleme" style="display:none; width:100%; border-radius:10px; border:1px solid rgba(148,163,184,.2); object-fit:cover; max-height:220px;" />
+        <div id="similar-preview-meta" style="display:none; font-size:12px; color:#cbd5f5; background:rgba(15,118,110,0.15); padding:6px 10px; border-radius:8px;"></div>
+      </div>
       
       <h2>🏷️ Etiket Yönetimi</h2>
       <div style="margin-top:16px;">
@@ -846,12 +852,14 @@ const state = {
   selectedVariants: [], // Seçili varyantlar
   tagLookup: {}, // Token -> etiket listesi
   pendingPreviewToken: null,
-  pendingPreviewFallback: false
+  pendingPreviewFallback: false,
+  similarSearchPreview: null
 };
 // Element referanslarını lazy olarak al (DOM hazır olduğunda)
 const elements = {};
 let cameraStreamHandle = null;
 let cameraFacingMode = 'environment';
+let similarPreviewObjectUrl = null;
 function getElements() {
   if (elements._initialized) return elements;
   Object.assign(elements, {
@@ -892,6 +900,10 @@ function getElements() {
     similarSearchBtn: document.getElementById('similar-search-btn'),
     galleryFileInput: document.getElementById('gallery-file-input'),
     cameraFileInput: document.getElementById('camera-file-input'),
+    similarPreviewCard: document.getElementById('similar-preview-card'),
+    similarPreviewImg: document.getElementById('similar-preview-img'),
+    similarPreviewEmpty: document.getElementById('similar-preview-empty'),
+    similarPreviewMeta: document.getElementById('similar-preview-meta'),
     searchInput: document.getElementById('search-input'),
     shareBtn: document.getElementById('share-btn'),
     removeFromTagBtn: document.getElementById('remove-from-tag-btn'),
@@ -911,6 +923,7 @@ function getElements() {
   return elements;
 }
 getElements(); // İlk çağrı
+renderSimilarSearchPreview();
 // Desen sol paneli için başlangıç HTML'ini sakla
 let defaultDesenFolderListHTML = (document.getElementById('folder-list')?.innerHTML) || '';
 const defaultLogoSrc = elements.sideLogo?.dataset?.default || elements.sideLogo?.src;
@@ -1050,7 +1063,7 @@ async function captureCameraFrame() {
       return;
     }
     const file = new File([blob], `kamera_${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
-    await searchByFile(file);
+    await searchByFile(file, { source: 'Kamera' });
   }, 'image/jpeg', 0.92);
   closeCameraModal(true);
 }
@@ -1749,9 +1762,68 @@ function triggerSimilarSearch(source) {
   input.click();
 }
 
+function setSimilarSearchPreview(file, sourceLabel) {
+  if (similarPreviewObjectUrl) {
+    URL.revokeObjectURL(similarPreviewObjectUrl);
+    similarPreviewObjectUrl = null;
+  }
+  if (!file) {
+    state.similarSearchPreview = null;
+    renderSimilarSearchPreview();
+    return;
+  }
+  try {
+    similarPreviewObjectUrl = URL.createObjectURL(file);
+  } catch (err) {
+    console.warn('Önizleme oluşturulamadı:', err);
+    state.similarSearchPreview = null;
+    renderSimilarSearchPreview();
+    return;
+  }
+  state.similarSearchPreview = {
+    url: similarPreviewObjectUrl,
+    name: file.name || 'Seçilen görsel',
+    sizeText: bytesToSize(file.size),
+    source: sourceLabel || 'Dosya'
+  };
+  renderSimilarSearchPreview();
+}
+
+function renderSimilarSearchPreview() {
+  if (!elements.similarPreviewCard) return;
+  const preview = state.similarSearchPreview;
+  if (!preview) {
+    if (elements.similarPreviewImg) {
+      elements.similarPreviewImg.style.display = 'none';
+      elements.similarPreviewImg.removeAttribute('src');
+    }
+    if (elements.similarPreviewMeta) {
+      elements.similarPreviewMeta.style.display = 'none';
+      elements.similarPreviewMeta.textContent = '';
+    }
+    if (elements.similarPreviewEmpty) {
+      elements.similarPreviewEmpty.style.display = 'block';
+    }
+    return;
+  }
+  if (elements.similarPreviewImg) {
+    elements.similarPreviewImg.src = preview.url;
+    elements.similarPreviewImg.style.display = 'block';
+  }
+  if (elements.similarPreviewMeta) {
+    elements.similarPreviewMeta.textContent = `${preview.source} · ${preview.name} · ${preview.sizeText}`;
+    elements.similarPreviewMeta.style.display = 'block';
+  }
+  if (elements.similarPreviewEmpty) {
+    elements.similarPreviewEmpty.style.display = 'none';
+  }
+}
+
 // Galeri veya kamera ile dosya seçip yükle
-async function searchByFile(file) {
+async function searchByFile(file, options = {}) {
   if (!file) return;
+  const sourceLabel = options.source || options.sourceLabel || 'Dosya';
+  setSimilarSearchPreview(file, sourceLabel);
   try {
     const fd = new FormData();
     fd.append('file', file);
@@ -1853,7 +1925,10 @@ elements.cameraFlipBtn?.addEventListener('click', async () => {
 [elements.galleryFileInput, elements.cameraFileInput].forEach(input => {
   input?.addEventListener('change', async () => {
     const f = input.files?.[0];
-    if (f) await searchByFile(f);
+    if (f) {
+      const source = input === elements.cameraFileInput ? 'Kamera' : 'Galeri';
+      await searchByFile(f, { source });
+    }
     input.value = '';
   });
 });
