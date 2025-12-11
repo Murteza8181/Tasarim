@@ -414,8 +414,17 @@
       flex-direction: column;
       gap: 2px;
     }
-    .gallery-item .label strong { font-size: .85rem; }
-    .gallery-item .label span { font-size: .7rem; color: var(--text-muted); }
+    .gallery-item .label strong {
+      font-size: .85rem;
+      color: #fff;
+      text-shadow: 0 1px 3px rgba(0,0,0,.6);
+    }
+    .gallery-item .label span {
+      font-size: .7rem;
+      color: #f8fafc;
+      opacity: .9;
+      text-shadow: 0 1px 3px rgba(0,0,0,.6);
+    }
     .gallery-item:hover { border-color: rgba(59,130,246,.5); box-shadow: 0 10px 25px rgba(15,23,42,.5); }
     @@media (max-width: 1200px) {
       .grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
